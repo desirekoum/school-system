@@ -40,3 +40,24 @@ export function schedule(fee, n, until) {
     amount: i < n - 1 ? part : fee - part * (n - 1),
   }));
 }
+
+export const ITEM_CATEGORIES = [
+  { value: 'uniform', label: 'Uniforms' },
+  { value: 'books', label: 'Books' },
+  { value: 'supplies', label: 'School supplies' },
+  { value: 'documents', label: 'Documents' },
+  { value: 'services', label: 'Services & fees' },
+  { value: 'other', label: 'Other' },
+];
+export const EXPENSE_CATEGORIES = [
+  { value: 'stock', label: 'Stock purchase (items for sale)' },
+  { value: 'supplies', label: 'Supplies' },
+  { value: 'furniture', label: 'Furniture' },
+  { value: 'equipment', label: 'Equipment' },
+  { value: 'maintenance', label: 'Maintenance & repairs' },
+  { value: 'utilities', label: 'Utilities (power, water, internet)' },
+  { value: 'transport', label: 'Transport & fuel' },
+  { value: 'events', label: 'Events' },
+  { value: 'other', label: 'Other' },
+];
+export const shortCategory = (v) => label(EXPENSE_CATEGORIES, v).replace(/ \(.*\)$/, '');

@@ -68,3 +68,13 @@ export const financesApi = {
   voidPayment: (id, reason) => http.post(`/finances/payments/${id}/void`, { reason }).then((r) => r.data),
   report: (academicYear) => http.get('/finances/report', { params: { academic_year: academicYear } }).then((r) => r.data),
 };
+
+export const itemsApi = resource('items');
+const journal = (name) => ({
+  list: (params) => http.get(`/${name}`, { params }).then((r) => r.data),
+  get: (id) => http.get(`/${name}/${id}`).then((r) => r.data),
+  create: (data) => http.post(`/${name}`, data).then((r) => r.data),
+  void: (id, reason) => http.post(`/${name}/${id}/void`, { reason }).then((r) => r.data),
+});
+export const salesApi = journal('sales');
+export const expensesApi = journal('expenses');

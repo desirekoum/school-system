@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { query } from '../../db/pool.js';
-import { HttpError } from '../../middleware/errors.js';
-import { paginatedList, buildWhere } from '../../db/paginate.js';
+import { paginatedList, buildWhere, withDateRange, paginatedWithSum, fullList } from '../../db/paginate.js';
 import {
   tx, recordPayment, voidPayment, receipt, requestPlan, decidePlan, account, report, ACCOUNTS,
 } from './finances.service.js';
@@ -44,32 +43,10 @@ const PAYMENTS = {
   filters: ['academic_year', 'class_id', 'method', 'voided'],
 };
 
-// Date range on top of the generic filters: ?from=YYYY-MM-DD&to=YYYY-MM-DD
-function withRange(q) {
-  const params = [];
-  const conds = [];
-  for (const [key, op] of [['from', '>='], ['to', '<=']]) {
-    if (!q[key]) continue;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(q[key])) throw new HttpError(400, `${key} must be a date (YYYY-MM-DD)`);
-    params.push(q[key]);
-    conds.push(`p.paid_at ${op} $${params.length}`);
-  }
-  return { ...PAYMENTS, baseSql: PAYMENTS.baseSql + (conds.length ? ` WHERE ${conds.join(' AND ')}` : ''), baseParams: params };
-}
-
 router.get('/payments', async (req, res) => {
-  const opts = withRange(req.query);
-  if (req.query.page !== undefined) {
-    const page = await paginatedList(req.query, opts);
-    // Sum of the whole filtered set (not just this page), for the journal footer
-    const { where, params } = buildWhere(req.query, opts, [...opts.baseParams]);
-    const { rows: [sum] } = await query(
-      `SELECT COALESCE(SUM(amount) FILTER (WHERE NOT voided), 0)::bigint::float AS total FROM (${opts.baseSql}) t ${where}`, params);
-    return res.json({ ...page, sum: sum.total });
-  }
-  const { where, params } = buildWhere(req.query, opts, [...opts.baseParams]);
-  const { rows } = await query(`SELECT * FROM (${opts.baseSql}) t ${where} ORDER BY ${opts.orderBy}`, params);
-  res.json(rows);
+  const opts = withDateRange(req.query, PAYMENTS, 'p.paid_at');
+  if (req.query.page === undefined) return res.json(await fullList(req.query, opts));
+  res.json(await paginatedWithSum(req.query, opts, 'SUM(amount) FILTER (WHERE NOT voided)'));
 });
 router.get('/payments/:id', async (req, res) => res.json(await receipt(req.params.id)));
 router.post('/payments', async (req, res) => {

@@ -1,4 +1,5 @@
 import { query } from './pool.js';
+import { HttpError } from '../middleware/errors.js';
 
 export const DEFAULT_PAGE_SIZE = 50;
 export const MAX_PAGE_SIZE = 100;
@@ -56,4 +57,36 @@ export async function paginatedList(q, { baseSql, baseParams = [], orderBy, sear
   }
   rows.forEach((r) => delete r._total);
   return { data: rows, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+}
+
+/**
+ * Date range on top of the generic filters: ?from=YYYY-MM-DD&to=YYYY-MM-DD on `column`.
+ * Returns list options whose baseSql carries the condition and baseParams its values.
+ * `opts.baseSql` must not already contain a WHERE clause.
+ */
+export function withDateRange(q, opts, column) {
+  const params = [];
+  const conds = [];
+  for (const [key, op] of [['from', '>='], ['to', '<=']]) {
+    if (!q[key]) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(q[key])) throw new HttpError(400, `${key} must be a date (YYYY-MM-DD)`);
+    params.push(q[key]);
+    conds.push(`${column} ${op} $${params.length}`);
+  }
+  return { ...opts, baseSql: opts.baseSql + (conds.length ? ` WHERE ${conds.join(' AND ')}` : ''), baseParams: params };
+}
+
+/** Paginated list plus the sum of `sumSql` over the whole filtered set (not just the page). */
+export async function paginatedWithSum(q, opts, sumSql) {
+  const page = await paginatedList(q, opts);
+  const { where, params } = buildWhere(q, opts, [...(opts.baseParams ?? [])]);
+  const { rows: [r] } = await query(`SELECT COALESCE(${sumSql}, 0)::bigint::float AS sum FROM (${opts.baseSql}) t ${where}`, params);
+  return { ...page, sum: r.sum };
+}
+
+/** Full (unpaginated) filtered list, e.g. for CSV export. */
+export async function fullList(q, opts) {
+  const { where, params } = buildWhere(q, opts, [...(opts.baseParams ?? [])]);
+  const { rows } = await query(`SELECT * FROM (${opts.baseSql}) t ${where} ORDER BY ${opts.orderBy}`, params);
+  return rows;
 }

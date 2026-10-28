@@ -25,6 +25,13 @@ classes.academic_year, registrations.academic_year ──> academic_years.name
   - An instalment plan (2 to 6 parts, adding up to the fee) is `requested`, then `approved` or `rejected`. Only approved plans count toward overdue amounts.
   - Payments are never deleted: they are voided with a reason. Receipt numbers come from a sequence (`REC-2026-000123`).
   - The views `registration_balances` and `instalment_progress` compute paid, balance and instalment status. A running `SUM() OVER` spreads the payments over the instalments in order.
+- **Shop and expenses** (migration `005`):
+  - `items` is the catalog of what the school sells. Stock is tracked unless it is left empty (services such as insurance).
+  - `sales` and `sale_items` record what was sold. The price is copied at sale time, and `amount` is a generated column. Item rows are locked in id order, so stock can't go negative and two sales can't deadlock.
+  - `expenses` records money spent, by category. A stock purchase (`item_id`) adds its quantity to the item's stock.
+  - Sales and expenses are voided, never deleted. Voiding gives the stock back, or takes it away again for a purchase.
+  - Receipt numbers: sales `VNT-2026-000001`, expense vouchers `DEP-2026-000001`.
+  - The financial report adds money in (tuition + sales), money out (expenses), net cash, monthly cash flow, expenses by category and best-selling items.
 
 - `registrations` has `UNIQUE (student_id, academic_year)`: one class per student per year.
 - Registration runs in a transaction with `SELECT … FOR UPDATE` on the class to enforce `capacity` safely under concurrency.
@@ -69,7 +76,9 @@ guardians (siblings share parents), and registrations. It also creates the acade
 (6 exams × every course), and finances:
 - tuition from 120,000 FCFA (6e) to 200,000 FCFA (Tle)
 - about 1,000 payments (cash, mobile money, transfers, cheques)
-- about 400 instalment plans (3 parts: September, January, April), some of them overdue Names, cities, nationalities
+- about 400 instalment plans (3 parts: September, January, April), some of them overdue
+- a shop of 17 items (uniforms, books, supplies, ID card, insurance...) with about 1,900 sales and restocks
+- about 45 expenses (electricity, water, internet, fuel, furniture, computers, repairs, events) Names, cities, nationalities
 and phone numbers come from Cameroon, Gabon, Congo, CAR, Chad and Equatorial Guinea. The generator
 is seeded, so every run gives the same data.
 
@@ -93,6 +102,9 @@ is seeded, so every run gives the same data.
 | `/api/finances/plans/:id` | `POST /approve`, `POST /reject` |
 | `/api/finances/payments` | `GET ?from&to&method&academic_year&voided` (+ `sum`), `GET /:id` (receipt), `POST {registration_id, amount, method, reference, paid_at, received_by, notes}`, `POST /:id/void {reason}` |
 | `/api/finances/report` | `GET ?academic_year=`: totals, per class, per method, per month, largest balances |
+| `/api/items` | CRUD (filters `category`, `is_active`; includes `sold`). Deleting an item with sales or purchases is refused: deactivate it instead |
+| `/api/sales` | `GET ?from&to&method&academic_year&student_id&voided` (+ `sum`), `GET /:id` (receipt with lines), `POST {student_id \| buyer_name, lines: [{item_id, quantity}], method, reference, sold_at}`, `POST /:id/void {reason}` |
+| `/api/expenses` | `GET ?from&to&category&method&academic_year&voided` (+ `sum`), `GET /:id`, `POST {category, description, item_id?, quantity, unit_price, supplier, spent_at, method, reference}`, `POST /:id/void {reason}` |
 | `/api/registrations` `POST` | also accepts `payment: {amount, method, reference}` and `plan: {instalments}`, both saved in the same transaction |
 
 **Pagination** — every list endpoint accepts `?page=1&pageSize=50` (default 50, max 100) and returns

@@ -11,7 +11,7 @@ import AppIcon from './AppIcon.vue';
 /**
  * Generic list + form page driven by a `fields` config:
  * [{ key, label, type?: 'text'|'date'|'number'|'email'|'textarea'|..., required?, default?,
- *    options?: [{value,label}], section?, badge?, filter?, list?: false, form?: false, format?: (value) => string }]
+ *    options?: [{value,label}], section?, badge?, filter?, list?: false, form?: false, format?: (value) => string, placeholder?, wrap? (long text wraps) }]
  * Fields with `filter: true` (and options) get a filter dropdown in the toolbar.
  * `identity(row)` → { name, sub?, photo? } renders a leading avatar + name column.
  * `rowLink(row)` → route location makes that name a link (e.g. to a detail page).
@@ -128,7 +128,7 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
                   </div>
                 </component>
               </td>
-              <td v-for="f in listFields" :key="f.key">
+              <td v-for="f in listFields" :key="f.key" :class="{ wrap: f.wrap }">
                 <StatusBadge v-if="f.badge" :value="row[f.key]" :label="label(f, row)" />
                 <template v-else>{{ label(f, row) ?? '—' }}</template>
               </td>
@@ -165,7 +165,7 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
                 <option v-for="o in f.options" :key="o.value" :value="o.value">{{ o.label }}</option>
               </select>
               <textarea v-else-if="f.type === 'textarea'" v-model="form[f.key]" rows="3" :required="f.required" />
-              <input v-else v-model="form[f.key]" :type="f.type ?? 'text'" :step="f.step" :required="f.required" />
+              <input v-else v-model="form[f.key]" :type="f.type ?? 'text'" :step="f.step" :required="f.required" :placeholder="f.placeholder" />
             </label>
           </div>
         </fieldset>

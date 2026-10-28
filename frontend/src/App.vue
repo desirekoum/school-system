@@ -18,7 +18,10 @@ const nav = [
   ] },
   { group: 'Finances', items: [
     { to: '/finances', label: 'Tuition & accounts', icon: 'wallet', exact: true },
-    { to: '/finances/payments', label: 'Payments', icon: 'receipt' },
+    { to: '/finances/payments', label: 'Tuition payments', icon: 'receipt' },
+    { to: '/finances/sales', label: 'Sales', icon: 'cart' },
+    { to: '/finances/items', label: 'Items for sale', icon: 'tag' },
+    { to: '/finances/expenses', label: 'Expenses', icon: 'expense' },
     { to: '/finances/reports', label: 'Financial reports', icon: 'chart' },
   ] },
 ];
