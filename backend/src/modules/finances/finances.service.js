@@ -207,7 +207,7 @@ export async function account(registrationId) {
 
 // ---------- Reports ----------
 
-/** Financial report of an academic year: totals, per class, per method, per month, debtors. */
+/** Financial report of an academic year: tuition, sales, expenses, cash flow per month, debtors. */
 export async function report(academicYear) {
   if (!academicYear) {
     const { rows: [y] } = await query('SELECT name FROM academic_years ORDER BY is_current DESC, name DESC LIMIT 1');
@@ -219,7 +219,11 @@ export async function report(academicYear) {
     SELECT p.* FROM payments p JOIN registrations r ON r.id = p.registration_id
     WHERE p.voided_at IS NULL AND r.academic_year = $1 AND r.status <> 'cancelled'`;
 
-  const [totals, byClass, byMethod, monthly, debtors, plans] = await Promise.all([
+  const LIVE_SALES = `SELECT s.*, st.total FROM sales s JOIN sale_totals st ON st.sale_id = s.id
+                      WHERE s.voided_at IS NULL AND s.academic_year = $1`;
+  const LIVE_EXPENSES = 'SELECT * FROM expenses WHERE voided_at IS NULL AND academic_year = $1';
+
+  const [totals, byClass, byMethod, monthly, debtors, plans, salesTotals, expenseTotals, byCategory, topItems] = await Promise.all([
     query(`
       SELECT count(*)::int AS registrations,
              COALESCE(SUM(fee), 0)::bigint::float AS expected,
@@ -243,28 +247,55 @@ export async function report(academicYear) {
       GROUP BY c.id ORDER BY c.name`, [academicYear]),
     query(`SELECT method, count(*)::int AS count, SUM(amount)::int AS total
            FROM (${LIVE_PAYMENTS}) p GROUP BY method ORDER BY total DESC`, [academicYear]),
-    // generate_series fills months with no payment, so the chart has no gaps
+    // Cash flow per month. Every money movement of the year becomes one row (UNION ALL),
+    // and generate_series fills months with no movement so the chart has no gaps.
     query(`
-      WITH bounds AS (
-        SELECT date_trunc('month', LEAST(MIN(p.paid_at), ay.start_date))::date AS first,
-               date_trunc('month', GREATEST(MAX(p.paid_at), LEAST(current_date, ay.end_date)))::date AS last
-        FROM academic_years ay LEFT JOIN (${LIVE_PAYMENTS}) p ON true
+      WITH moves AS (
+        SELECT paid_at AS day, amount, 'tuition' AS kind FROM (${LIVE_PAYMENTS}) p
+        UNION ALL
+        SELECT s.sold_at, st.total, 'sales' FROM sales s JOIN sale_totals st ON st.sale_id = s.id
+        WHERE s.voided_at IS NULL AND s.academic_year = $1
+        UNION ALL
+        SELECT e.spent_at, e.amount, 'expenses' FROM expenses e WHERE e.voided_at IS NULL AND e.academic_year = $1
+      ),
+      bounds AS (
+        SELECT date_trunc('month', LEAST(MIN(m.day), ay.start_date))::date AS first,
+               date_trunc('month', GREATEST(MAX(m.day), LEAST(current_date, ay.end_date)))::date AS last
+        FROM academic_years ay LEFT JOIN moves m ON true
         WHERE ay.name = $1 GROUP BY ay.start_date, ay.end_date
       )
-      SELECT to_char(m, 'YYYY-MM') AS month, COALESCE(SUM(p.amount), 0)::int AS total, count(p.id)::int AS count
-      FROM bounds, generate_series(bounds.first, bounds.last, interval '1 month') AS m
-      LEFT JOIN (${LIVE_PAYMENTS}) p ON date_trunc('month', p.paid_at) = m
-      GROUP BY m ORDER BY m`, [academicYear]),
+      SELECT to_char(mo, 'YYYY-MM') AS month,
+             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'tuition'), 0)::int AS tuition,
+             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'sales'), 0)::int AS sales,
+             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'expenses'), 0)::int AS expenses
+      FROM bounds, generate_series(bounds.first, bounds.last, interval '1 month') AS mo
+      LEFT JOIN moves m ON date_trunc('month', m.day) = mo
+      GROUP BY mo ORDER BY mo`, [academicYear]),
     query(`SELECT id, student, matricule, class_name, fee, paid, balance, overdue, next_due_date, plan_status
            FROM (${ACTIVE}) t WHERE balance > 0
            ORDER BY overdue DESC, balance DESC, student LIMIT 20`, [academicYear]),
     query(`SELECT ip.status, count(*)::int AS n FROM instalment_plans ip
            JOIN registrations r ON r.id = ip.registration_id
            WHERE r.academic_year = $1 AND r.status <> 'cancelled' GROUP BY ip.status`, [academicYear]),
+    query(`SELECT count(*)::int AS count, COALESCE(SUM(total), 0)::bigint::float AS total FROM (${LIVE_SALES}) s`, [academicYear]),
+    query(`SELECT count(*)::int AS count, COALESCE(SUM(amount), 0)::bigint::float AS total FROM (${LIVE_EXPENSES}) e`, [academicYear]),
+    query(`SELECT category, count(*)::int AS count, SUM(amount)::int AS total
+           FROM (${LIVE_EXPENSES}) e GROUP BY category ORDER BY total DESC`, [academicYear]),
+    query(`SELECT i.id, i.code, i.name, SUM(si.quantity)::int AS quantity, SUM(si.amount)::int AS total
+           FROM (${LIVE_SALES}) s JOIN sale_items si ON si.sale_id = s.id JOIN items i ON i.id = si.item_id
+           GROUP BY i.id ORDER BY total DESC LIMIT 10`, [academicYear]),
   ]);
 
   const t = totals.rows[0];
+  const sales = salesTotals.rows[0];
+  const spent = expenseTotals.rows[0];
+  const income = t.collected + sales.total;
   return {
+    // Cash position of the year: money in (tuition + sales) minus money out (expenses)
+    cash: { tuition: t.collected, sales: sales.total, sales_count: sales.count, income,
+            expenses: spent.total, expenses_count: spent.count, net: income - spent.total },
+    by_category: byCategory.rows,
+    top_items: topItems.rows,
     academic_year: academicYear,
     totals: { ...t, collection_rate: t.expected ? Math.round((t.collected / t.expected) * 1000) / 10 : null },
     plans: Object.fromEntries(plans.rows.map((p) => [p.status, p.n])),

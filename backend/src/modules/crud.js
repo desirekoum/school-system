@@ -8,9 +8,9 @@ import { paginatedList, buildWhere } from '../db/paginate.js';
  * `fields` is a whitelist: only these columns can be written (prevents mass assignment).
  * List: `?page=` returns a paginated envelope { data, total, page, pageSize, totalPages };
  * without it, the full array (used by dropdowns). Both accept `?search=` and the `filters` columns.
- * `afterUpdate(row)`, when given, runs after a successful PUT.
+ * `afterUpdate(row)`, when given, runs after a successful PUT; `beforeDelete(id)` can refuse a DELETE by throwing.
  */
-export function crudRouter({ table, fields, required = [], orderBy = 'id', listSql, searchColumns = [], filters = [], afterUpdate }) {
+export function crudRouter({ table, fields, required = [], orderBy = 'id', listSql, searchColumns = [], filters = [], afterUpdate, beforeDelete }) {
   const router = Router();
 
   // Empty form inputs ('') become NULL so optional columns stay valid
@@ -59,6 +59,7 @@ export function crudRouter({ table, fields, required = [], orderBy = 'id', listS
   });
 
   router.delete('/:id', async (req, res) => {
+    if (beforeDelete) await beforeDelete(req.params.id);
     const { rowCount } = await query(`DELETE FROM ${table} WHERE id = $1`, [req.params.id]);
     if (!rowCount) throw new HttpError(404, 'Not found');
     res.status(204).end();

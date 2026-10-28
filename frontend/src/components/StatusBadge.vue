@@ -8,11 +8,13 @@ const TONES = {
   // finances
   paid: 'success', approved: 'success', partial: 'warning', requested: 'info',
   unpaid: 'danger', overdue: 'danger', rejected: 'danger', voided: 'neutral', upcoming: 'neutral',
+  // booleans (e.g. item on sale / withdrawn)
+  true: 'success', false: 'neutral',
 };
-defineProps({ value: String, label: String });
+defineProps({ value: [String, Boolean], label: String });
 </script>
 
 <template>
-  <span v-if="value" :class="['badge', TONES[value] ?? 'neutral']"><i class="dot" />{{ label ?? value }}</span>
+  <span v-if="value !== undefined && value !== null && value !== ''" :class="['badge', TONES[value] ?? 'neutral']"><i class="dot" />{{ label ?? value }}</span>
   <span v-else class="muted">—</span>
 </template>

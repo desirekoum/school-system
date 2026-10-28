@@ -6,7 +6,8 @@
  *   npm run populate -- --reset   # wipes all tables first
  *
  * Also creates the academic year (3 trimesters × 2 exams), a full year of grades, and the finances:
- * tuition fee per class, payments (cash, mobile money, transfers, cheques) and instalment plans.
+ * tuition fee per class, payments (cash, mobile money, transfers, cheques), instalment plans,
+ * the school shop (items, stock, sales to students) and the year's expenses.
  * Uses a seeded random generator, so every run produces the same data set
  * (payments dated after today are simply not recorded yet).
  */
@@ -103,6 +104,27 @@ const ACADEMIC_YEAR = '2026-2027';
 const START_YEAR = 2026;
 // Yearly tuition in FCFA, higher in exam classes (3e: BEPC, Tle: Baccalauréat)
 const TUITION = { '6e': 120000, '5e': 125000, '4e': 135000, '3e': 150000, '2nde': 165000, '1ère': 180000, 'Tle': 200000 };
+// School shop: [code, name, category, price, tracked stock?, active]
+const ITEMS = [
+  ['UNI-COMP', 'Uniforme complet (chemise + pantalon/jupe)', 'uniform', 15000, true, true],
+  ['UNI-POLO', "Polo de l'établissement", 'uniform', 4500, true, true],
+  ['UNI-SPORT', 'Tenue de sport', 'uniform', 6000, true, true],
+  ['UNI-OLD', 'Ancien polo (modèle 2024)', 'uniform', 3000, true, false],
+  ['DOC-CARTE', 'Carte scolaire', 'documents', 1500, false, true],
+  ['DOC-CARNET', 'Carnet de correspondance', 'documents', 1000, true, true],
+  ['BK-MATH', 'Manuel de mathématiques (collège)', 'books', 5500, true, true],
+  ['BK-FR', 'Manuel de français (collège)', 'books', 5000, true, true],
+  ['BK-ANG', 'English for Africa (collège)', 'books', 4800, true, true],
+  ['BK-PC', 'Physique-Chimie (lycée)', 'books', 7500, true, true],
+  ['BK-PHILO', 'Philosophie Terminale', 'books', 6500, true, true],
+  ['SUP-CAH', 'Lot de 10 cahiers 200 pages', 'supplies', 3500, true, true],
+  ['SUP-KIT', 'Kit de géométrie', 'supplies', 1500, true, true],
+  ['SUP-BLOUSE', 'Blouse de laboratoire', 'supplies', 4000, true, true],
+  ['SRV-ASSUR', 'Assurance scolaire', 'services', 2500, false, true],
+  ['SRV-EXAM', "Frais d'examen blanc", 'services', 3000, false, true],
+  ['SRV-PHOTO', "Photos d'identité (lot de 4)", 'services', 1000, false, true],
+];
+const SUPPLIERS = { uniform: 'Couture Moderne SARL', books: 'Librairie des Peuples Noirs', documents: 'Imprimerie Saint-Paul', supplies: 'Papeterie Le Bon Élève' };
 const CASHIERS = ['Mme Ngo Bassa (Économat)', 'M. Ndzi Paul (Caisse)', 'Mme Abessolo Rose (Économat)'];
 
 // [code, name, coefficient, hours/week, levels it applies to (null = all), teacher specialty]
@@ -182,7 +204,7 @@ async function populate() {
     await client.query('BEGIN');
     if (RESET) {
       // RESTART IDENTITY resets SERIAL counters; CASCADE empties dependent tables too
-      await client.query(`TRUNCATE payments, instalments, instalment_plans, grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
+      await client.query(`TRUNCATE sale_items, sales, expenses, items, payments, instalments, instalment_plans, grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
                           classes, academic_years, courses, students, teachers RESTART IDENTITY CASCADE`);
     }
 
@@ -478,10 +500,119 @@ async function populate() {
     });
     await insertMany(client, 'students', formerRows, null);
 
+    // --- School shop: catalog, purchases (expenses that add stock), sales to students ---
+    const itemRows = ITEMS.map(([code, name, category, price, tracked, is_active]) => ({ code, name, category, price, stock: tracked ? 0 : null, is_active }));
+    const itemIds = (await insertMany(client, 'items', itemRows)).map((r) => r.id);
+    const byCode = Object.fromEntries(ITEMS.map(([code], k) => [code, k]));
+    const stock = itemRows.map((r) => r.stock);
+    const expRows = [];
+    const buy = (k, quantity, date) => {
+      if (date > today) return;
+      const [, name, category, price] = ITEMS[k];
+      expRows.push({ category: 'stock', description: `Achat stock : ${name}`, supplier: SUPPLIERS[category] ?? 'Fournisseur divers',
+        item: k, quantity, unit_price: Math.round(price * 0.65 / 50) * 50, spent_at: date, method: pick(['bank_transfer', 'cheque', 'cash']), approved_by: 'Le Principal' });
+      if (stock[k] !== null) stock[k] += quantity;
+    };
+    // Main restock before the start of the year, a second one for uniforms in October
+    const RESTOCK = { 'UNI-COMP': 380, 'UNI-POLO': 520, 'UNI-SPORT': 480, 'UNI-OLD': 40, 'DOC-CARNET': 900, 'BK-MATH': 260, 'BK-FR': 240,
+      'BK-ANG': 230, 'BK-PC': 160, 'BK-PHILO': 70, 'SUP-CAH': 520, 'SUP-KIT': 300, 'SUP-BLOUSE': 120 };
+    for (const [code, q] of Object.entries(RESTOCK)) buy(byCode[code], q, `${START_YEAR}-07-${String(int(2, 12)).padStart(2, '0')}`);
+    for (const code of ['UNI-COMP', 'UNI-POLO', 'SUP-CAH']) buy(byCode[code], int(8, 14) * 10, `${START_YEAR}-10-${String(int(5, 12)).padStart(2, '0')}`);
+
+    const saleRows = [];   // { student, buyer_name, sold_at, lines: [[k, qty]] }
+    const sell = (student, buyer_name, date, wanted) => {
+      if (date > today) return;
+      const lines = [];
+      for (const [k, q] of wanted) {
+        if (!ITEMS[k][5]) continue;
+        if (stock[k] !== null && stock[k] < q) continue; // out of stock: not sold
+        if (stock[k] !== null) stock[k] -= q;
+        lines.push([k, q]);
+      }
+      if (!lines.length) return;
+      const m = method();
+      saleRows.push({ student, buyer_name, sold_at: date, method: m, reference: reference(m), received_by: pick(CASHIERS), lines });
+    };
+    const ex = (code) => byCode[code];
+    regRows.forEach((r, i) => {
+      if (r.status === 'cancelled') return;
+      const day0 = addDays(r.registered_at.slice(0, 10), int(0, 10));
+      const levelIndex = LEVELS.indexOf(classes[classOf[i]].level);
+      const first = [[ex('DOC-CARTE'), 1]];
+      if (chance(0.85)) first.push([ex('SRV-ASSUR'), 1]);
+      if (chance(0.7)) first.push([ex('DOC-CARNET'), 1]);
+      if (chance(0.35)) first.push([ex('UNI-COMP'), 1]);
+      if (chance(0.55)) first.push([ex('UNI-POLO'), int(1, 2)]);
+      if (chance(0.4)) first.push([ex('UNI-SPORT'), 1]);
+      sell(i, null, day0, first);
+      const second = [];
+      if (levelIndex <= 3 && chance(0.3)) second.push([ex(pick(['BK-MATH', 'BK-FR', 'BK-ANG'])), 1]);
+      if (levelIndex >= 4 && chance(0.25)) second.push([ex('BK-PC'), 1]);
+      if (levelIndex === 6 && chance(0.4)) second.push([ex('BK-PHILO'), 1]);
+      if (chance(0.3)) second.push([ex('SUP-CAH'), int(1, 2)]);
+      if (chance(0.2)) second.push([ex('SUP-KIT'), 1]);
+      if (levelIndex >= 4 && chance(0.15)) second.push([ex('SUP-BLOUSE'), 1]);
+      if (chance(0.15)) second.push([ex('SRV-PHOTO'), 1]);
+      if (second.length) sell(i, null, addDays(day0, int(3, 40)), second);
+      // Mock exams for the exam classes (3e: BEPC, Tle: Baccalauréat)
+      if ((levelIndex === 3 || levelIndex === 6) && chance(0.8)) sell(i, null, `${START_YEAR}-10-${String(int(13, 24)).padStart(2, '0')}`, [[ex('SRV-EXAM'), 1]]);
+    });
+    for (let n = 0; n < 25; n++) {
+      const p = person();
+      sell(null, `${p.first_name} ${p.last_name} (parent)`, `${START_YEAR}-${pick(['08', '09', '10'])}-${String(int(1, 28)).padStart(2, '0')}`,
+        [[ex(pick(['UNI-POLO', 'UNI-SPORT', 'SUP-CAH', 'UNI-COMP'])), int(1, 3)]]);
+    }
+    saleRows.sort((a, b) => a.sold_at.localeCompare(b.sold_at));
+    const saleIds = (await insertMany(client, 'sales', saleRows.map((x, n) => ({
+      receipt_number: `VNT-${x.sold_at.slice(0, 4)}-${String(n + 1).padStart(6, '0')}`,
+      student_id: x.student === null ? null : studentIds[x.student], buyer_name: x.buyer_name, academic_year: ACADEMIC_YEAR,
+      sold_at: x.sold_at, method: x.method, reference: x.reference, received_by: x.received_by,
+    })))).map((r) => r.id);
+    await insertMany(client, 'sale_items', saleRows.flatMap((x, n) =>
+      x.lines.map(([k, quantity]) => ({ sale_id: saleIds[n], item_id: itemIds[k], quantity, unit_price: ITEMS[k][3] }))), null);
+    await client.query('SELECT setval($1, $2)', ['sale_seq', saleRows.length || 1]);
+
+    // --- Running costs of the year ---
+    const monthsSoFar = [];
+    for (let d = new Date(Date.UTC(START_YEAR, 6, 1)); d.toISOString().slice(0, 10) <= today && d.getUTCFullYear() <= START_YEAR + 1; d.setUTCMonth(d.getUTCMonth() + 1)) {
+      monthsSoFar.push(d.toISOString().slice(0, 7));
+    }
+    const dd = (n) => String(n).padStart(2, '0');
+    const spend = (category, description, supplier, quantity, unit_price, date, method = 'bank_transfer') => {
+      if (date <= today) expRows.push({ category, description, supplier, item: null, quantity, unit_price, spent_at: date, method, approved_by: pick(['Le Principal', 'L\'Économe']) });
+    };
+    for (const m of monthsSoFar) {
+      spend('utilities', `Électricité ${m}`, 'ENEO', 1, int(85, 140) * 1000, `${m}-${dd(int(5, 10))}`);
+      spend('utilities', `Eau ${m}`, 'CAMWATER', 1, int(25, 45) * 1000, `${m}-${dd(int(5, 10))}`);
+      spend('utilities', `Internet fibre ${m}`, 'CAMTEL', 1, 60000, `${m}-02`);
+      spend('transport', `Carburant groupe électrogène ${m}`, 'Tradex', int(150, 260), 840, `${m}-${dd(int(12, 20))}`, 'cash');
+      spend('supplies', `Craies, marqueurs et rames de papier ${m}`, 'Papeterie Le Bon Élève', 1, int(60, 120) * 1000, `${m}-${dd(int(1, 6))}`, 'cash');
+    }
+    spend('furniture', 'Tables-bancs pour les salles de 6e', 'Menuiserie Ebène', 40, 35000, `${START_YEAR}-08-05`);
+    spend('furniture', 'Armoires métalliques (secrétariat)', 'Bureau Pro Douala', 3, 95000, `${START_YEAR}-08-12`);
+    spend('equipment', 'Ordinateurs pour la salle informatique', 'Infotech Cameroun', 5, 350000, `${START_YEAR}-08-20`, 'cheque');
+    spend('equipment', 'Vidéoprojecteur', 'Infotech Cameroun', 1, 280000, `${START_YEAR}-09-03`, 'cheque');
+    spend('maintenance', 'Peinture des salles du bâtiment B', 'BTP Services', 1, 450000, `${START_YEAR}-07-22`);
+    spend('maintenance', 'Réparation de la toiture (préau)', 'BTP Services', 1, 320000, `${START_YEAR}-10-02`);
+    spend('maintenance', 'Plomberie des sanitaires', 'Plombier M. Atangana', 1, 85000, `${START_YEAR}-09-18`, 'cash');
+    spend('events', 'Cérémonie de rentrée solennelle', 'Traiteur La Saveur', 1, 250000, `${START_YEAR}-09-12`);
+    spend('events', 'Journée sportive inter-classes', 'Divers', 1, 180000, `${START_YEAR}-10-17`, 'cash');
+    expRows.sort((a, b) => a.spent_at.localeCompare(b.spent_at));
+    await insertMany(client, 'expenses', expRows.map(({ item, ...e }, n) => ({
+      voucher_number: `DEP-${e.spent_at.slice(0, 4)}-${String(n + 1).padStart(6, '0')}`,
+      academic_year: ACADEMIC_YEAR, item_id: item === null ? null : itemIds[item],
+      reference: e.method === 'cash' ? null : e.method === 'cheque' ? `CHQ ${int(1000000, 9999999)}` : `VIR-${int(100000, 999999)}`,
+      ...e,
+    })), null);
+    await client.query('SELECT setval($1, $2)', ['expense_seq', expRows.length || 1]);
+    // Final stock = purchases − sales, computed above while simulating the year
+    await client.query(`UPDATE items i SET stock = u.stock FROM unnest($1::int[], $2::int[]) AS u(id, stock) WHERE i.id = u.id`,
+      [itemIds, stock.map((x) => x ?? null)]);
+
     await client.query('COMMIT');
     console.log(`Done: ${teacherRows.length} teachers, ${courseRows.length} courses, ${classes.length} classes, ` +
       `${studentRows.length + formerRows.length} students, ${guardianRows.length} guardians, ${regRows.length} registrations, ${gradeRows.length} grades, ` +
-      `${planIds.length} instalment plans, ${payRows.length} payments.`);
+      `${planIds.length} instalment plans, ${payRows.length} payments, ${itemRows.length} items, ${saleRows.length} sales, ${expRows.length} expenses.`);
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

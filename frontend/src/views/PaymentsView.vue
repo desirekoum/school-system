@@ -7,6 +7,7 @@ import PaginationBar from '../components/PaginationBar.vue';
 import { financesApi, academicYearsApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { money, METHODS, methodLabel } from '../config/finance';
+import { downloadCsv } from '../utils/csv';
 
 const years = ref([]);
 const { items, total, totalPages, page, pageSize, search, filters, loading, error, meta } = usePaginatedList(
@@ -24,20 +25,16 @@ function range(kind) {
   filters.to = kind ? iso(now) : '';
 }
 
-// CSV export of the whole filtered journal (not just the current page), opened by Excel / LibreOffice
+// CSV export of the whole filtered journal (not just the current page)
 const exporting = ref(false);
 async function exportCsv() {
   exporting.value = true;
   try {
     const rows = await financesApi.payments({ ...filters, search: search.value || undefined });
-    const cols = [['receipt_number', 'Receipt'], ['paid_at', 'Date'], ['student', 'Student'], ['matricule', 'Matricule'], ['class_name', 'Class'],
-      ['academic_year', 'Year'], ['method', 'Method'], ['reference', 'Reference'], ['amount', 'Amount (FCFA)'], ['received_by', 'Received by'], ['voided', 'Voided']];
-    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const csv = [cols.map(([, h]) => cell(h)).join(';'), ...rows.map((r) => cols.map(([k]) => cell(k === 'method' ? methodLabel(r[k]) : r[k])).join(';'))].join('\r\n');
-    // BOM so Excel reads the accents (é, è) as UTF-8
-    const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-    Object.assign(document.createElement('a'), { href: url, download: `payments-${filters.from || 'all'}-${filters.to || 'all'}.csv` }).click();
-    URL.revokeObjectURL(url);
+    downloadCsv(`payments-${filters.from || 'all'}-${filters.to || 'all'}.csv`, rows, [
+      ['receipt_number', 'Receipt'], ['paid_at', 'Date'], ['student', 'Student'], ['matricule', 'Matricule'], ['class_name', 'Class'],
+      ['academic_year', 'Year'], ['method', 'Method', methodLabel], ['reference', 'Reference'], ['amount', 'Amount (FCFA)'],
+      ['received_by', 'Received by'], ['voided', 'Voided']]);
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -48,7 +45,7 @@ async function exportCsv() {
 
 <template>
   <section>
-    <PageHeader title="Payments" subtitle="Journal of every tuition payment received, with its receipt.">
+    <PageHeader title="Tuition payments" subtitle="Journal of every tuition payment received, with its receipt.">
       <button class="btn secondary" :disabled="exporting" @click="exportCsv"><AppIcon name="download" />Export CSV</button>
     </PageHeader>
 
