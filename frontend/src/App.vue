@@ -60,6 +60,7 @@ watch(() => route.fullPath, () => (open.value = false));
           <Transition name="fade" mode="out-in"><component :is="Component" :key="route.fullPath" /></Transition>
         </RouterView>
       </main>
+      <footer class="app-footer">© {{ now.getFullYear() }} Bytes-Corp. All rights reserved.</footer>
     </div>
   </div>
 </template>
