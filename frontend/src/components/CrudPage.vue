@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { useCrud } from '../composables/useCrud';
+import { usePaginatedList } from '../composables/usePaginatedList';
+import PaginationBar from './PaginationBar.vue';
 import PageHeader from './PageHeader.vue';
 import SlideOver from './SlideOver.vue';
 import StatusBadge from './StatusBadge.vue';
@@ -10,7 +11,8 @@ import AppIcon from './AppIcon.vue';
 /**
  * Generic list + form page driven by a `fields` config:
  * [{ key, label, type?: 'text'|'date'|'number'|'email'|'textarea'|..., required?, default?,
- *    options?: [{value,label}], section?, badge?, list?: false, form?: false }]
+ *    options?: [{value,label}], section?, badge?, filter?, list?: false, form?: false }]
+ * Fields with `filter: true` (and options) get a filter dropdown in the toolbar.
  * `identity(row)` → { name, sub?, photo? } renders a leading avatar + name column.
  * `rowLink(row)` → route location makes that name a link (e.g. to a detail page).
  */
@@ -24,9 +26,15 @@ const props = defineProps({
   rowLink: Function,
 });
 
-const { items, loading, error, save, remove } = useCrud(props.api);
+const filterFields = computed(() => props.fields.filter((f) => f.filter && f.options));
+// Server-side pagination: only the current page is loaded, search and filters run in SQL
+const { items, total, totalPages, page, pageSize, search, filters, loading, error, load } = usePaginatedList(
+  (params) => props.api.list(params),
+  { filters: Object.fromEntries(props.fields.filter((f) => f.filter).map((f) => [f.key, ''])) },
+);
 const form = ref(null); // null = panel closed
-const search = ref('');
+const saving = ref(false);
+const formError = ref('');
 
 const empty = () => Object.fromEntries(props.fields.map((f) => [f.key, f.default ?? '']));
 const listFields = computed(() => props.fields.filter((f) => f.list !== false));
@@ -42,13 +50,6 @@ const sections = computed(() => {
   return [...groups].map(([name, fields]) => ({ name, fields }));
 });
 
-// Client-side search over every value of the row (fine for school-sized lists)
-const filtered = computed(() => {
-  const q = search.value.trim().toLowerCase();
-  if (!q) return items.value;
-  return items.value.filter((row) => Object.values(row).some((v) => v != null && String(v).toLowerCase().includes(q)));
-});
-
 const openNew = () => (form.value = empty());
 // Spread copy so editing doesn't mutate the row until saved
 const openEdit = (row) => (form.value = { ...row, ...dateFix(row) });
@@ -56,13 +57,31 @@ const dateFix = (row) =>
   Object.fromEntries(props.fields.filter((f) => f.type === 'date' && row[f.key]).map((f) => [f.key, row[f.key].slice(0, 10)]));
 
 async function submit() {
-  await save(form.value).catch(() => {});
-  if (!error.value) form.value = null;
+  saving.value = true;
+  formError.value = '';
+  try {
+    const data = form.value;
+    await (data.id ? props.api.update(data.id, data) : props.api.create(data));
+    form.value = null;
+    await load();
+  } catch (e) {
+    formError.value = e.message;
+  } finally {
+    saving.value = false;
+  }
 }
 
-function confirmRemove(row) {
-  if (confirm(`Delete this ${props.singular}?`)) remove(row.id).catch(() => {});
+async function confirmRemove(row) {
+  if (!confirm(`Delete this ${props.singular}?`)) return;
+  try {
+    await props.api.remove(row.id);
+    await load();
+  } catch (e) {
+    error.value = e.message;
+  }
 }
+
+const isFiltered = computed(() => !!search.value || Object.values(filters).some(Boolean));
 
 const label = (f, row) => f.options?.find((o) => o.value == row[f.key])?.label ?? row[f.key];
 </script>
@@ -73,7 +92,7 @@ const label = (f, row) => f.options?.find((o) => o.value == row[f.key])?.label ?
       <button class="btn primary" @click="openNew"><AppIcon name="plus" />New {{ singular }}</button>
     </PageHeader>
 
-    <div v-if="error && !form" class="alert"><AppIcon name="alert" />{{ error }}</div>
+    <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
 
     <div class="card">
       <div class="toolbar">
@@ -81,10 +100,15 @@ const label = (f, row) => f.options?.find((o) => o.value == row[f.key])?.label ?
           <AppIcon name="search" size="16" />
           <input v-model="search" type="search" :placeholder="`Search ${title.toLowerCase()}…`" />
         </label>
-        <span class="muted small">{{ filtered.length }} of {{ items.length }}</span>
+        <div class="filters">
+          <select v-for="f in filterFields" :key="f.key" v-model="filters[f.key]" :aria-label="`Filter by ${f.label}`">
+            <option value="">Any {{ f.label.toLowerCase() }}</option>
+            <option v-for="o in f.options" :key="o.value" :value="o.value">{{ o.label }}</option>
+          </select>
+        </div>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap" :class="{ 'is-loading': loading && items.length }">
         <table class="table">
           <thead>
             <tr>
@@ -94,7 +118,7 @@ const label = (f, row) => f.options?.find((o) => o.value == row[f.key])?.label ?
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in filtered" :key="row.id">
+            <tr v-for="row in items" :key="row.id">
               <td v-if="identity">
                 <component :is="rowLink ? 'RouterLink' : 'div'" :to="rowLink?.(row)" class="identity">
                   <Avatar :name="identity(row).name" :src="identity(row).photo" />
@@ -119,16 +143,17 @@ const label = (f, row) => f.options?.find((o) => o.value == row[f.key])?.label ?
           </tbody>
         </table>
         <div v-if="loading && !items.length" class="empty">Loading…</div>
-        <div v-else-if="!filtered.length" class="empty">
+        <div v-else-if="!items.length" class="empty">
           <AppIcon name="inbox" size="32" />
-          <p>{{ search ? 'No match for your search.' : `No ${title.toLowerCase()} yet.` }}</p>
-          <button v-if="!search" class="btn secondary" @click="openNew"><AppIcon name="plus" />Add the first one</button>
+          <p>{{ isFiltered ? 'No match for your search.' : `No ${title.toLowerCase()} yet.` }}</p>
+          <button v-if="!isFiltered" class="btn secondary" @click="openNew"><AppIcon name="plus" />Add the first one</button>
         </div>
       </div>
+      <PaginationBar v-if="total" v-model:page="page" v-model:page-size="pageSize" :total="total" :total-pages="totalPages" />
     </div>
 
     <SlideOver v-if="form" :title="form.id ? `Edit ${singular}` : `New ${singular}`" @close="form = null">
-      <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
+      <div v-if="formError" class="alert"><AppIcon name="alert" />{{ formError }}</div>
       <form id="crud-form" @submit.prevent="submit">
         <fieldset v-for="s in sections" :key="s.name" class="form-section">
           <legend v-if="s.name">{{ s.name }}</legend>
@@ -147,7 +172,7 @@ const label = (f, row) => f.options?.find((o) => o.value == row[f.key])?.label ?
       </form>
       <template #footer>
         <button type="button" class="btn secondary" @click="form = null">Cancel</button>
-        <button type="submit" form="crud-form" class="btn primary" :disabled="loading">{{ loading ? 'Saving…' : 'Save' }}</button>
+        <button type="submit" form="crud-form" class="btn primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save' }}</button>
       </template>
     </SlideOver>
   </section>

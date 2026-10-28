@@ -1,47 +1,52 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import PageHeader from '../components/PageHeader.vue';
 import SlideOver from '../components/SlideOver.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import Avatar from '../components/Avatar.vue';
 import AppIcon from '../components/AppIcon.vue';
 import { registrationsApi, studentsApi, classesApi } from '../api/http';
+import { usePaginatedList } from '../composables/usePaginatedList';
+import PaginationBar from '../components/PaginationBar.vue';
 
-const registrations = ref([]);
 const students = ref([]);
 const classes = ref([]);
 const form = ref(null);
-const error = ref('');
-const tab = ref('all');
+const formError = ref('');
 
-const load = async () => (registrations.value = await registrationsApi.list());
+// Server-side pagination; `status` is a filter driven by the tabs
+const { items: registrations, total, totalPages, meta, page, pageSize, search, filters, loading, error, load } =
+  usePaginatedList((params) => registrationsApi.list(params), { filters: { status: '' } });
 
-onMounted(async () => {
-  [students.value, classes.value] = await Promise.all([studentsApi.list(), classesApi.list()]);
-  await load();
-});
+const counts = computed(() => meta.value.counts ?? {});
+const tabs = computed(() => [
+  { key: '', label: 'All', count: Object.values(counts.value).reduce((a, b) => a + b, 0) },
+  ...['pending', 'confirmed', 'cancelled'].map((key) => ({ key, label: key[0].toUpperCase() + key.slice(1), count: counts.value[key] ?? 0 })),
+]);
 
-const tabs = computed(() => ['all', 'pending', 'confirmed', 'cancelled'].map((key) => ({
-  key,
-  count: key === 'all' ? registrations.value.length : registrations.value.filter((r) => r.status === key).length,
-})));
-const visible = computed(() => (tab.value === 'all' ? registrations.value : registrations.value.filter((r) => r.status === tab.value)));
+const refreshClasses = async () => (classes.value = await classesApi.list()); // seat counts
 
-async function wrap(fn) {
-  error.value = '';
+// Dropdown data is only needed when the form opens (active students only)
+async function openForm() {
+  formError.value = '';
+  form.value = { student_id: '', class_id: '' };
+  [students.value] = await Promise.all([studentsApi.list({ status: 'active' }), refreshClasses()]);
+}
+
+async function wrap(fn, errorRef = error) {
+  errorRef.value = '';
   try {
     await fn();
     await load();
-    classes.value = await classesApi.list(); // refresh seat counts
     return true;
   } catch (e) {
-    error.value = e.message;
+    errorRef.value = e.message;
     return false;
   }
 }
 
 async function register() {
-  if (await wrap(() => registrationsApi.create(form.value))) form.value = null;
+  if (await wrap(() => registrationsApi.create(form.value), formError)) form.value = null;
 }
 const setStatus = (r, status) => wrap(() => registrationsApi.setStatus(r.id, status));
 const remove = (r) => confirm('Delete this registration?') && wrap(() => registrationsApi.remove(r.id));
@@ -50,24 +55,28 @@ const remove = (r) => confirm('Delete this registration?') && wrap(() => registr
 <template>
   <section>
     <PageHeader title="Registrations" subtitle="Enroll students in classes and confirm their registration.">
-      <button class="btn primary" @click="form = { student_id: '', class_id: '' }"><AppIcon name="plus" />New registration</button>
+      <button class="btn primary" @click="openForm"><AppIcon name="plus" />New registration</button>
     </PageHeader>
 
-    <div v-if="error && !form" class="alert"><AppIcon name="alert" />{{ error }}</div>
+    <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
 
     <div class="card">
       <div class="toolbar">
         <div class="tabs">
-          <button v-for="t in tabs" :key="t.key" :class="['tab', { active: tab === t.key }]" @click="tab = t.key">
-            {{ t.key[0].toUpperCase() + t.key.slice(1) }} <span class="count">{{ t.count }}</span>
+          <button v-for="t in tabs" :key="t.key" :class="['tab', { active: filters.status === t.key }]" @click="filters.status = t.key">
+            {{ t.label }} <span class="count">{{ t.count.toLocaleString() }}</span>
           </button>
         </div>
+        <label class="search">
+          <AppIcon name="search" size="16" />
+          <input v-model="search" type="search" placeholder="Search student, matricule or class…" />
+        </label>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap" :class="{ 'is-loading': loading && registrations.length }">
         <table class="table">
           <thead><tr><th>Student</th><th>Class</th><th>Year</th><th>Date</th><th>Status</th><th class="right">Actions</th></tr></thead>
           <tbody>
-            <tr v-for="r in visible" :key="r.id">
+            <tr v-for="r in registrations" :key="r.id">
               <td>
                 <RouterLink :to="`/students/${r.student_id}`" class="identity">
                   <Avatar :name="r.student" />
@@ -88,12 +97,13 @@ const remove = (r) => confirm('Delete this registration?') && wrap(() => registr
             </tr>
           </tbody>
         </table>
-        <div v-if="!visible.length" class="empty"><AppIcon name="inbox" size="32" /><p>No registrations here.</p></div>
+        <div v-if="!loading && !registrations.length" class="empty"><AppIcon name="inbox" size="32" /><p>No registrations here.</p></div>
       </div>
+      <PaginationBar v-if="total" v-model:page="page" v-model:page-size="pageSize" :total="total" :total-pages="totalPages" />
     </div>
 
     <SlideOver v-if="form" title="New registration" @close="form = null">
-      <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
+      <div v-if="formError" class="alert"><AppIcon name="alert" />{{ formError }}</div>
       <form id="reg-form" class="form-grid one" @submit.prevent="register">
         <label class="field">
           <span>Student<b class="req">*</b></span>
