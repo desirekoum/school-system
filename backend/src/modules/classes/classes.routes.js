@@ -1,6 +1,7 @@
 import { crudRouter } from '../crud.js';
 import { query } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
+import { paginatedList } from '../../db/paginate.js';
 
 const router = crudRouter({
   table: 'classes',
@@ -10,8 +11,10 @@ const router = crudRouter({
   listSql: `
     SELECT c.*, t.first_name || ' ' || t.last_name AS homeroom_teacher,
            (SELECT count(*)::int FROM registrations r WHERE r.class_id = c.id AND r.status = 'confirmed') AS enrolled
-    FROM classes c LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id
-    ORDER BY c.academic_year DESC, c.name`,
+    FROM classes c LEFT JOIN teachers t ON t.id = c.homeroom_teacher_id`,
+  orderBy: 'academic_year DESC, name',
+  searchColumns: ['name', 'level', 'academic_year', 'homeroom_teacher'],
+  filters: ['level', 'academic_year'],
 });
 
 // Courses taught in a class
@@ -41,12 +44,20 @@ router.delete('/:id/courses/:courseId', async (req, res) => {
   res.status(204).end();
 });
 
-// Students registered in a class
+// Students registered in a class (paginated when ?page is given)
+const ROSTER_SQL = `
+  SELECT s.*, r.status AS registration_status, r.id AS registration_id
+  FROM registrations r JOIN students s ON s.id = r.student_id
+  WHERE r.class_id = $1`;
+
 router.get('/:id/students', async (req, res) => {
-  const { rows } = await query(`
-    SELECT s.*, r.status AS registration_status, r.id AS registration_id
-    FROM registrations r JOIN students s ON s.id = r.student_id
-    WHERE r.class_id = $1 ORDER BY s.last_name, s.first_name`, [req.params.id]);
+  if (req.query.page !== undefined) {
+    return res.json(await paginatedList(req.query, {
+      baseSql: ROSTER_SQL, baseParams: [req.params.id], orderBy: 'last_name, first_name',
+      searchColumns: ['matricule', 'first_name', 'last_name'], filters: ['registration_status'],
+    }));
+  }
+  const { rows } = await query(`${ROSTER_SQL} ORDER BY s.last_name, s.first_name`, [req.params.id]);
   res.json(rows);
 });
 

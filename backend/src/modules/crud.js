@@ -1,20 +1,29 @@
 import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { HttpError } from '../middleware/errors.js';
+import { paginatedList, buildWhere } from '../db/paginate.js';
 
 /**
  * Generic CRUD repository + router for a table.
  * `fields` is a whitelist: only these columns can be written (prevents mass assignment).
+ * List: `?page=` returns a paginated envelope { data, total, page, pageSize, totalPages };
+ * without it, the full array (used by dropdowns). Both accept `?search=` and the `filters` columns.
  */
-export function crudRouter({ table, fields, required = [], orderBy = 'id', listSql }) {
+export function crudRouter({ table, fields, required = [], orderBy = 'id', listSql, searchColumns = [], filters = [] }) {
   const router = Router();
 
   // Empty form inputs ('') become NULL so optional columns stay valid
   const pick = (body) => Object.fromEntries(
     fields.filter(f => body[f] !== undefined).map(f => [f, body[f] === '' ? null : body[f]]));
 
+  // listSql must not contain ORDER BY: it is wrapped as a subquery and ordered by `orderBy`
+  const baseSql = listSql ?? `SELECT * FROM ${table}`;
+  const listOptions = { baseSql, orderBy, searchColumns, filters };
+
   router.get('/', async (req, res) => {
-    const { rows } = await query(listSql ?? `SELECT * FROM ${table} ORDER BY ${orderBy}`);
+    if (req.query.page !== undefined) return res.json(await paginatedList(req.query, listOptions));
+    const { where, params } = buildWhere(req.query, listOptions);
+    const { rows } = await query(`SELECT * FROM (${baseSql}) t ${where} ORDER BY ${orderBy}`, params);
     res.json(rows);
   });
 

@@ -15,8 +15,10 @@ const router = crudRouter({
     SELECT s.*, NULLIF(concat_ws(' ', g.first_name, g.last_name), '') AS primary_guardian, g.phone AS primary_guardian_phone
     FROM students s
     LEFT JOIN student_guardians sg ON sg.student_id = s.id AND sg.is_primary
-    LEFT JOIN guardians g ON g.id = sg.guardian_id
-    ORDER BY s.last_name, s.first_name`,
+    LEFT JOIN guardians g ON g.id = sg.guardian_id`,
+  orderBy: 'last_name, first_name',
+  searchColumns: ['matricule', 'first_name', 'last_name', 'email', 'phone', 'primary_guardian'],
+  filters: ['status', 'gender'],
 });
 
 const GUARDIAN_FIELDS = ['first_name', 'last_name', 'phone', 'email', 'profession', 'address'];

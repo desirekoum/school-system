@@ -20,7 +20,7 @@ const fields = [
   { section: 'Contact', key: 'emergency_contact_name', label: 'Emergency contact', list: false },
   { section: 'Contact', key: 'emergency_contact_phone', label: 'Emergency phone', list: false },
 
-  { section: 'Schooling', key: 'status', label: 'Status', options: STUDENT_STATUSES, required: true, default: 'active', badge: true },
+  { section: 'Schooling', key: 'status', label: 'Status', options: STUDENT_STATUSES, required: true, default: 'active', badge: true, filter: true },
   // Form sends every key, so the DB default (CURRENT_DATE) wouldn't apply: prefill today instead
   { section: 'Schooling', key: 'admission_date', label: 'Admission date', type: 'date', list: false, default: new Date().toISOString().slice(0, 10) },
   { section: 'Schooling', key: 'previous_school', label: 'Previous school', list: false },

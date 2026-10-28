@@ -266,16 +266,17 @@ async function populate() {
         const fam = family ?? { lastName, country: p.country, city: p.city, address: address(p), idx: familyList.length };
         if (!family) familyList.push(fam);
         // Typical age: 11 in 6e, +1 per level, with some repeating a year
+        const firstName = pick(FIRST_NAMES[p.gender]);
         const age = 11 + levelIndex + (chance(0.2) ? 1 : 0) + (chance(0.05) ? 1 : 0);
         studentRows.push({
           matricule: `${String(START_YEAR).slice(2)}${fam.country === COUNTRIES.CM ? 'CM' : 'ET'}${String(matricule++).padStart(4, '0')}`,
-          first_name: pick(FIRST_NAMES[p.gender]),
+          first_name: firstName,
           last_name: lastName,
           gender: p.gender,
           birth_date: isoDate(START_YEAR - age, int(1, 12), int(1, 28)),
           birth_place: chance(0.8) ? fam.city : pick(fam.country.cities),
           nationality: fam.country.name,
-          email: chance(0.3) ? `${slug(p.first_name)}.${slug(lastName)}${matricule}@gmail.com` : null,
+          email: chance(0.3) ? `${slug(firstName)}.${slug(lastName)}${matricule}@gmail.com` : null,
           phone: levelIndex >= 3 && chance(0.5) ? fam.country.phone() : null,
           address: fam.address,
           blood_group: chance(0.85) ? weighted(BLOOD) : null,

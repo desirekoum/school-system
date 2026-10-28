@@ -5,24 +5,27 @@ import PageHeader from '../components/PageHeader.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import Avatar from '../components/Avatar.vue';
 import AppIcon from '../components/AppIcon.vue';
+import PaginationBar from '../components/PaginationBar.vue';
+import { usePaginatedList } from '../composables/usePaginatedList';
 
 const props = defineProps({ id: String }); // injected from the route via `props: true`
 
 const cls = ref(null);
 const courses = ref([]);
-const students = ref([]);
 const allCourses = ref([]);
 const teachers = ref([]);
 const assign = ref({ course_id: '', teacher_id: '' });
 const error = ref('');
 
+// Roster is paginated server-side like the other lists
+const { items: students, total: studentTotal, totalPages, page, pageSize, loading: rosterLoading } =
+  usePaginatedList((params) => classesApi.students(props.id, params));
+
 const totalHours = computed(() => courses.value.reduce((sum, c) => sum + c.hours_per_week, 0));
 
 async function load() {
   // Promise.all runs the requests in parallel
-  [cls.value, courses.value, students.value] = await Promise.all([
-    classesApi.get(props.id), classesApi.courses(props.id), classesApi.students(props.id),
-  ]);
+  [cls.value, courses.value] = await Promise.all([classesApi.get(props.id), classesApi.courses(props.id)]);
 }
 
 onMounted(async () => {
@@ -54,7 +57,7 @@ async function unassign(courseId) {
 
     <div class="stats">
       <div class="card stat"><span class="stat-icon"><AppIcon name="students" size="22" /></span>
-        <div><p class="muted small">Students</p><p class="stat-value">{{ students.length }} <small>/ {{ cls.capacity }}</small></p></div></div>
+        <div><p class="muted small">Students</p><p class="stat-value">{{ studentTotal }} <small>/ {{ cls.capacity }}</small></p></div></div>
       <div class="card stat"><span class="stat-icon"><AppIcon name="courses" size="22" /></span>
         <div><p class="muted small">Courses</p><p class="stat-value">{{ courses.length }}</p></div></div>
       <div class="card stat"><span class="stat-icon"><AppIcon name="registrations" size="22" /></span>
@@ -101,8 +104,9 @@ async function unassign(courseId) {
             </RouterLink>
             <StatusBadge :value="s.registration_status" />
           </li>
-          <li v-if="!students.length" class="muted">No students registered.</li>
+          <li v-if="!rosterLoading && !students.length" class="muted">No students registered.</li>
         </ul>
+        <PaginationBar v-if="studentTotal > pageSize" v-model:page="page" v-model:page-size="pageSize" :total="studentTotal" :total-pages="totalPages" />
       </div>
     </div>
   </section>

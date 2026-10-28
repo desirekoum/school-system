@@ -2,18 +2,36 @@ import { Router } from 'express';
 import { query } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
 import { register } from './registrations.service.js';
+import { paginatedList, buildWhere } from '../../db/paginate.js';
 
 const router = Router();
 const STATUSES = ['pending', 'confirmed', 'cancelled'];
 
-router.get('/', async (req, res) => {
-  const { rows } = await query(`
+const LIST = {
+  baseSql: `
     SELECT r.*, s.matricule, s.first_name || ' ' || s.last_name AS student, c.name AS class_name
     FROM registrations r
     JOIN students s ON s.id = r.student_id
-    JOIN classes c ON c.id = r.class_id
-    ORDER BY r.registered_at DESC`);
-  res.json(rows);
+    JOIN classes c ON c.id = r.class_id`,
+  orderBy: 'registered_at DESC, id DESC',
+  searchColumns: ['student', 'matricule', 'class_name'],
+  filters: ['status', 'class_id', 'academic_year'],
+};
+
+router.get('/', async (req, res) => {
+  if (req.query.page === undefined) {
+    const { where, params } = buildWhere(req.query, LIST);
+    const { rows } = await query(`SELECT * FROM (${LIST.baseSql}) t ${where} ORDER BY ${LIST.orderBy}`, params);
+    return res.json(rows);
+  }
+  // Per-status counts for the filter tabs: same search, but ignoring the status filter
+  const { status, ...withoutStatus } = req.query;
+  const { where, params } = buildWhere(withoutStatus, LIST);
+  const [page, counts] = await Promise.all([
+    paginatedList(req.query, LIST),
+    query(`SELECT t.status, count(*)::int AS n FROM (${LIST.baseSql}) t ${where} GROUP BY t.status`, params),
+  ]);
+  res.json({ ...page, counts: Object.fromEntries(counts.rows.map((r) => [r.status, r.n])) });
 });
 
 router.post('/', async (req, res) => {

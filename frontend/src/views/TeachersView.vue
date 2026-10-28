@@ -16,8 +16,8 @@ const fields = [
   { section: 'Contact', key: 'address', label: 'Address', list: false },
 
   { section: 'Job', key: 'specialty', label: 'Specialty' },
-  { section: 'Job', key: 'status', label: 'Status', options: TEACHER_STATUSES, required: true, default: 'active', badge: true },
-  { section: 'Job', key: 'contract_type', label: 'Contract', options: CONTRACT_TYPES },
+  { section: 'Job', key: 'status', label: 'Status', options: TEACHER_STATUSES, required: true, default: 'active', badge: true, filter: true },
+  { section: 'Job', key: 'contract_type', label: 'Contract', options: CONTRACT_TYPES, filter: true },
   { section: 'Job', key: 'hire_date', label: 'Hire date', type: 'date', list: false },
   { section: 'Job', key: 'qualifications', label: 'Qualifications / diplomas', type: 'textarea', list: false },
 

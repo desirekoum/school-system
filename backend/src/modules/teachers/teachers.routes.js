@@ -9,4 +9,6 @@ export default crudRouter({
   ],
   required: ['first_name', 'last_name', 'email'],
   orderBy: 'last_name, first_name',
+  searchColumns: ['employee_number', 'first_name', 'last_name', 'email', 'phone', 'specialty'],
+  filters: ['status', 'contract_type', 'specialty'],
 });

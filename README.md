@@ -66,3 +66,8 @@ is seeded, so every run gives the same data.
 | `/api/guardians` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
 | `/api/students/:id/guardians` | `GET`, `POST {guardian_id \| new guardian fields, relation, is_primary}`, `DELETE /:guardianId` |
 | `/api/registrations` | `GET /`, `POST {student_id, class_id}`, `PATCH /:id/status {status}`, `DELETE /:id` |
+
+**Pagination** — every list endpoint accepts `?page=1&pageSize=50` (default 50, max 100) and returns
+`{ data, total, page, pageSize, totalPages }` (registrations also return per-status `counts`).
+Lists also take `?search=` and exact filters (e.g. `?status=active`). Without `page`, the full array is
+returned, which the dropdowns use.

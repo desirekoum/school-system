@@ -5,30 +5,42 @@ import AppIcon from '../components/AppIcon.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { studentsApi, teachersApi, classesApi, coursesApi, registrationsApi } from '../api/http';
 
-const data = ref({ students: [], teachers: [], classes: [], courses: [], registrations: [] });
+const totals = ref({});
+const recent = ref([]);
+const counts = ref({});
+const classes = ref([]);
 const loaded = ref(false);
 
+// pageSize=1 gives the total count without downloading the whole table
+const countOf = (api, filters = {}) => api.list({ page: 1, pageSize: 1, ...filters }).then((r) => r.total);
+
 onMounted(async () => {
-  const [students, teachers, classes, courses, registrations] = await Promise.all([
-    studentsApi.list(), teachersApi.list(), classesApi.list(), coursesApi.list(), registrationsApi.list(),
+  const [students, teachers, courses, regs, cls] = await Promise.all([
+    countOf(studentsApi, { status: 'active' }),
+    countOf(teachersApi, { status: 'active' }),
+    countOf(coursesApi),
+    registrationsApi.list({ page: 1, pageSize: 6 }),
+    classesApi.list(),
   ]);
-  data.value = { students, teachers, classes, courses, registrations };
+  totals.value = { students, teachers, courses };
+  recent.value = regs.data;
+  counts.value = regs.counts;
+  classes.value = cls;
   loaded.value = true;
 });
 
 const stats = computed(() => [
-  { label: 'Active students', value: data.value.students.filter((s) => s.status === 'active').length, icon: 'students', to: '/students' },
-  { label: 'Active teachers', value: data.value.teachers.filter((t) => t.status === 'active').length, icon: 'teachers', to: '/teachers' },
-  { label: 'Classes', value: data.value.classes.length, icon: 'classes', to: '/classes' },
-  { label: 'Courses', value: data.value.courses.length, icon: 'courses', to: '/courses' },
+  { label: 'Active students', value: totals.value.students, icon: 'students', to: '/students' },
+  { label: 'Active teachers', value: totals.value.teachers, icon: 'teachers', to: '/teachers' },
+  { label: 'Classes', value: classes.value.length, icon: 'classes', to: '/classes' },
+  { label: 'Courses', value: totals.value.courses, icon: 'courses', to: '/courses' },
 ]);
 
-const pending = computed(() => data.value.registrations.filter((r) => r.status === 'pending'));
-const recent = computed(() => data.value.registrations.slice(0, 6));
+const pending = computed(() => counts.value.pending ?? 0);
 
 // Fill rate per class, for the capacity bars
 const occupancy = computed(() =>
-  data.value.classes.map((c) => ({ ...c, pct: Math.min(100, Math.round((c.enrolled / c.capacity) * 100)) })));
+  classes.value.map((c) => ({ ...c, pct: Math.min(100, Math.round((c.enrolled / c.capacity) * 100)) })));
 </script>
 
 <template>
@@ -40,7 +52,7 @@ const occupancy = computed(() =>
         <span class="stat-icon"><AppIcon :name="s.icon" size="22" /></span>
         <div>
           <p class="muted small">{{ s.label }}</p>
-          <p class="stat-value">{{ loaded ? s.value : '–' }}</p>
+          <p class="stat-value">{{ loaded ? s.value.toLocaleString() : '–' }}</p>
         </div>
       </RouterLink>
     </div>
@@ -61,9 +73,9 @@ const occupancy = computed(() =>
           </li>
           <li v-if="loaded && !recent.length" class="muted">No registrations yet.</li>
         </ul>
-        <p v-if="pending.length" class="card-foot">
-          <AppIcon name="alert" size="16" /> {{ pending.length }} registration{{ pending.length > 1 ? 's' : '' }} waiting for confirmation
-        </p>
+        <RouterLink v-if="pending" to="/registrations" class="card-foot">
+          <AppIcon name="alert" size="16" /> {{ pending }} registration{{ pending > 1 ? 's' : '' }} waiting for confirmation
+        </RouterLink>
       </div>
 
       <div class="card">
