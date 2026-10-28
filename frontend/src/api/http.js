@@ -17,7 +17,13 @@ export const resource = (name) => ({
   remove: (id) => http.delete(`/${name}/${id}`),
 });
 
-export const studentsApi = resource('students');
+export const studentsApi = {
+  ...resource('students'),
+  guardians: (id) => http.get(`/students/${id}/guardians`).then((r) => r.data),
+  addGuardian: (id, data) => http.post(`/students/${id}/guardians`, data).then((r) => r.data),
+  removeGuardian: (id, guardianId) => http.delete(`/students/${id}/guardians/${guardianId}`),
+};
+export const guardiansApi = resource('guardians');
 export const teachersApi = resource('teachers');
 export const coursesApi = resource('courses');
 export const classesApi = {
