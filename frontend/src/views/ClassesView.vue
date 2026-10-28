@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import CrudPage from '../components/CrudPage.vue';
 import AppIcon from '../components/AppIcon.vue';
 import { classesApi, teachersApi, academicYearsApi } from '../api/http';
+import { money } from '../config/finance';
 
 const teachers = ref([]);
 const years = ref([]);
@@ -23,6 +24,7 @@ const fields = computed(() => [
     options: years.value.map((y) => ({ value: y.name, label: y.name })),
   },
   { key: 'capacity', label: 'Capacity', type: 'number', required: true, default: 40 },
+  { key: 'tuition_fee', label: 'Tuition (FCFA)', type: 'number', required: true, default: 0, format: money },
   {
     key: 'homeroom_teacher_id',
     label: 'Homeroom teacher',

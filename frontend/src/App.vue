@@ -5,7 +5,7 @@ import AppIcon from './components/AppIcon.vue';
 import logo from './assets/logo.png';
 
 const nav = [
-  { group: 'Overview', items: [{ to: '/', label: 'Dashboard', icon: 'dashboard' }] },
+  { group: 'Overview', items: [{ to: '/', label: 'Dashboard', icon: 'dashboard', exact: true }] },
   { group: 'People', items: [
     { to: '/students', label: 'Students', icon: 'students' },
     { to: '/teachers', label: 'Teachers', icon: 'teachers' },
@@ -15,6 +15,11 @@ const nav = [
     { to: '/registrations', label: 'Registrations', icon: 'registrations' },
     { to: '/classes', label: 'Classes', icon: 'classes' },
     { to: '/courses', label: 'Courses', icon: 'courses' },
+  ] },
+  { group: 'Finances', items: [
+    { to: '/finances', label: 'Tuition & accounts', icon: 'wallet', exact: true },
+    { to: '/finances/payments', label: 'Payments', icon: 'receipt' },
+    { to: '/finances/reports', label: 'Financial reports', icon: 'chart' },
   ] },
 ];
 
@@ -39,10 +44,10 @@ watch(() => route.fullPath, () => (open.value = false));
       <nav>
         <div v-for="g in nav" :key="g.group" class="nav-group">
           <p class="nav-title">{{ g.group }}</p>
-          <!-- exact-active for "/" so Dashboard isn't highlighted on every page -->
+          <!-- exact match for "/" and "/finances", so they aren't highlighted on their sub-pages -->
           <RouterLink v-for="i in g.items" :key="i.to" :to="i.to" class="nav-link"
-                      :exact-active-class="i.to === '/' ? 'active' : ''"
-                      :active-class="i.to === '/' ? '' : 'active'">
+                      :exact-active-class="i.exact ? 'active' : ''"
+                      :active-class="i.exact ? '' : 'active'">
             <AppIcon :name="i.icon" />{{ i.label }}
           </RouterLink>
         </div>

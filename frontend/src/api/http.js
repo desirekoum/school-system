@@ -54,3 +54,17 @@ export const academicYearsApi = {
   updateTrimester: (id, data) => http.put(`/academic-years/trimesters/${id}`, data).then((r) => r.data),
   updateExam: (id, data) => http.put(`/academic-years/exams/${id}`, data).then((r) => r.data),
 };
+
+export const financesApi = {
+  accounts: (params) => http.get('/finances/accounts', { params }).then((r) => r.data),
+  account: (id) => http.get(`/finances/accounts/${id}`).then((r) => r.data),
+  requestPlan: (id, data) => http.put(`/finances/accounts/${id}/plan`, data).then((r) => r.data),
+  removePlan: (id) => http.delete(`/finances/accounts/${id}/plan`),
+  approvePlan: (planId) => http.post(`/finances/plans/${planId}/approve`).then((r) => r.data),
+  rejectPlan: (planId) => http.post(`/finances/plans/${planId}/reject`).then((r) => r.data),
+  payments: (params) => http.get('/finances/payments', { params }).then((r) => r.data),
+  payment: (id) => http.get(`/finances/payments/${id}`).then((r) => r.data),
+  pay: (data) => http.post('/finances/payments', data).then((r) => r.data),
+  voidPayment: (id, reason) => http.post(`/finances/payments/${id}/void`, { reason }).then((r) => r.data),
+  report: (academicYear) => http.get('/finances/report', { params: { academic_year: academicYear } }).then((r) => r.data),
+};

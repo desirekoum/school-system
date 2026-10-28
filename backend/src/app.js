@@ -7,6 +7,7 @@ import courses from './modules/courses/courses.routes.js';
 import registrations from './modules/registrations/registrations.routes.js';
 import guardians from './modules/guardians/guardians.routes.js';
 import academicYears from './modules/academic-years/academic-years.routes.js';
+import finances from './modules/finances/finances.routes.js';
 import { errorHandler } from './middleware/errors.js';
 
 export const app = express();
@@ -22,6 +23,7 @@ app.use('/api/courses', courses);
 app.use('/api/registrations', registrations);
 app.use('/api/guardians', guardians);
 app.use('/api/academic-years', academicYears);
+app.use('/api/finances', finances);
 
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 // Express 5 forwards rejected async handlers here automatically

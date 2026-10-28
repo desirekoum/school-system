@@ -8,6 +8,7 @@ import StatusBadge from '../components/StatusBadge.vue';
 import Avatar from '../components/Avatar.vue';
 import AppIcon from '../components/AppIcon.vue';
 import ReportCard from '../components/ReportCard.vue';
+import StudentTuition from '../components/StudentTuition.vue';
 
 const props = defineProps({ id: String });
 
@@ -91,6 +92,8 @@ async function removeGuardian(g) {
         </dl>
       </div>
     </div>
+
+    <StudentTuition :student-id="id" />
 
     <ReportCard :student-id="id" />
 
