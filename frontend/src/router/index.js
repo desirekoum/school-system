@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 // Lazy-loaded routes: each view is split into its own JS chunk
 const routes = [
-  { path: '/', redirect: '/students' },
+  { path: '/', component: () => import('../views/DashboardView.vue') },
   { path: '/students', component: () => import('../views/StudentsView.vue') },
   { path: '/students/:id', component: () => import('../views/StudentDetailView.vue'), props: true },
   { path: '/registrations', component: () => import('../views/RegistrationsView.vue') },

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import CrudPage from '../components/CrudPage.vue';
+import AppIcon from '../components/AppIcon.vue';
 import { classesApi, teachersApi } from '../api/http';
 
 const teachers = ref([]);
@@ -11,7 +12,7 @@ const fields = computed(() => [
   { key: 'name', label: 'Name', required: true },
   { key: 'level', label: 'Level', required: true },
   { key: 'academic_year', label: 'Year', required: true },
-  { key: 'capacity', label: 'Capacity', type: 'number' },
+  { key: 'capacity', label: 'Capacity', type: 'number', required: true, default: 40 },
   {
     key: 'homeroom_teacher_id',
     label: 'Homeroom teacher',
@@ -22,9 +23,10 @@ const fields = computed(() => [
 </script>
 
 <template>
-  <CrudPage title="Classes" :api="classesApi" :fields="fields">
+  <CrudPage title="Classes" singular="class" subtitle="Classes per academic year, homeroom teachers and enrollment."
+            :api="classesApi" :fields="fields">
     <template #actions="{ row }">
-      <RouterLink :to="`/classes/${row.id}`" class="btn secondary">Open</RouterLink>
+      <RouterLink :to="`/classes/${row.id}`" class="icon-btn" title="Open"><AppIcon name="chevronRight" size="16" /></RouterLink>
     </template>
   </CrudPage>
 </template>

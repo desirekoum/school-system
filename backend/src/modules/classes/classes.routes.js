@@ -44,7 +44,7 @@ router.delete('/:id/courses/:courseId', async (req, res) => {
 // Students registered in a class
 router.get('/:id/students', async (req, res) => {
   const { rows } = await query(`
-    SELECT s.*, r.status, r.id AS registration_id
+    SELECT s.*, r.status AS registration_status, r.id AS registration_id
     FROM registrations r JOIN students s ON s.id = r.student_id
     WHERE r.class_id = $1 ORDER BY s.last_name, s.first_name`, [req.params.id]);
   res.json(rows);
