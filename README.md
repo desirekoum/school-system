@@ -42,6 +42,20 @@ cd backend && cp .env.example .env && npm i && npm run migrate && npm run dev   
 cd frontend && npm i && npm run dev                                            # :5173 (proxies /api)
 ```
 
+### Sample data
+
+```bash
+cd backend
+npm run populate              # fills an empty database
+npm run populate -- --reset   # wipes all tables, then reseeds
+```
+
+Generates a realistic Central African secondary school (French system, 6e → Tle) for the 2026-2027 year:
+~50 teachers (salaries in FCFA), 14 courses, 21 classes of 50–60 seats, ~1,000 students with
+guardians (siblings share parents), and registrations (mostly confirmed). Names, cities, nationalities
+and phone numbers come from Cameroon, Gabon, Congo, CAR, Chad and Equatorial Guinea. The generator
+is seeded, so every run gives the same data.
+
 ## API
 
 | Resource | Endpoints |
