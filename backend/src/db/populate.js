@@ -5,8 +5,10 @@
  *   npm run populate              # refuses if data already exists
  *   npm run populate -- --reset   # wipes all tables first
  *
- * Also creates the academic year (3 trimesters × 2 exams) and a full year of grades.
- * Uses a seeded random generator, so every run produces the same data set.
+ * Also creates the academic year (3 trimesters × 2 exams), a full year of grades, and the finances:
+ * tuition fee per class, payments (cash, mobile money, transfers, cheques) and instalment plans.
+ * Uses a seeded random generator, so every run produces the same data set
+ * (payments dated after today are simply not recorded yet).
  */
 import { pool } from './pool.js';
 import { splitInTrimesters } from '../modules/academic-years/academic-years.service.js';
@@ -99,6 +101,9 @@ const LEVELS = ['6e', '5e', '4e', '3e', '2nde', '1ère', 'Tle'];
 const SECTIONS = ['A', 'B', 'C'];
 const ACADEMIC_YEAR = '2026-2027';
 const START_YEAR = 2026;
+// Yearly tuition in FCFA, higher in exam classes (3e: BEPC, Tle: Baccalauréat)
+const TUITION = { '6e': 120000, '5e': 125000, '4e': 135000, '3e': 150000, '2nde': 165000, '1ère': 180000, 'Tle': 200000 };
+const CASHIERS = ['Mme Ngo Bassa (Économat)', 'M. Ndzi Paul (Caisse)', 'Mme Abessolo Rose (Économat)'];
 
 // [code, name, coefficient, hours/week, levels it applies to (null = all), teacher specialty]
 const COURSES = [
@@ -177,7 +182,7 @@ async function populate() {
     await client.query('BEGIN');
     if (RESET) {
       // RESTART IDENTITY resets SERIAL counters; CASCADE empties dependent tables too
-      await client.query(`TRUNCATE grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
+      await client.query(`TRUNCATE payments, instalments, instalment_plans, grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
                           classes, academic_years, courses, students, teachers RESTART IDENTITY CASCADE`);
     }
 
@@ -245,10 +250,10 @@ async function populate() {
     const classRows = [];
     for (const level of LEVELS) {
       for (const section of SECTIONS) {
-        classRows.push({ name: `${level} ${section}`, level, academic_year: ACADEMIC_YEAR, capacity: int(10, 12) * 5 });
+        classRows.push({ name: `${level} ${section}`, level, academic_year: ACADEMIC_YEAR, capacity: int(10, 12) * 5, tuition_fee: TUITION[level] });
       }
     }
-    const classes = await insertMany(client, 'classes', classRows, 'id, level, capacity');
+    const classes = await insertMany(client, 'classes', classRows, 'id, level, capacity, tuition_fee');
 
     // --- Class ↔ course assignments, spreading each specialty's teachers across classes ---
     const cursor = {};
@@ -353,15 +358,91 @@ async function populate() {
     });
     await insertMany(client, 'student_guardians', sgRows, null);
 
-    // --- Registrations: one per student in their class, mostly confirmed ---
+    // --- Registrations: one per student in their class; the class fee is copied onto it ---
     const regRows = studentIds.map((sid, i) => ({
       student_id: sid,
       class_id: classes[classOf[i]].id,
       academic_year: ACADEMIC_YEAR,
-      status: weighted([['confirmed', 88], ['pending', 10], ['cancelled', 2]]),
+      tuition_fee: classes[classOf[i]].tuition_fee,
+      status: chance(0.02) ? 'cancelled' : 'pending', // confirmed below once fully paid
       registered_at: `${START_YEAR}-${pick(['07', '08', '09'])}-${String(int(1, 28)).padStart(2, '0')}T${String(int(8, 16)).padStart(2, '0')}:00:00Z`,
     }));
-    await insertMany(client, 'registrations', regRows, null);
+
+    // --- Finances: who paid what, when, how ---
+    const today = new Date().toISOString().slice(0, 10);
+    const addDays = (iso, n) => new Date(Date.parse(iso) + n * 86400000).toISOString().slice(0, 10);
+    const method = () => weighted([['cash', 40], ['mobile_money', 42], ['bank_transfer', 13], ['cheque', 5]]);
+    const reference = (m) => ({
+      cash: null,
+      mobile_money: `${pick(['OM', 'MOMO', 'AIRTEL'])}-${int(1000000000, 9999999999)}`,
+      bank_transfer: `VIR-${int(100000, 999999)}`,
+      cheque: `CHQ ${int(1000000, 9999999)}`,
+    })[m];
+    const due = [`${START_YEAR}-09-15`, `${START_YEAR + 1}-01-15`, `${START_YEAR + 1}-04-15`];
+    const payRows = [];  // { reg, amount, paid_at, ... }
+    const planOf = [];   // per registration: null | { status, instalments }
+    const pay = (reg, amount, date, extra = {}) => {
+      if (amount <= 0 || date > today) return 0; // not paid yet
+      const m = method();
+      payRows.push({ reg, amount, method: m, reference: reference(m), paid_at: date, received_by: pick(CASHIERS), ...extra });
+      return amount;
+    };
+    regRows.forEach((r, i) => {
+      planOf[i] = null;
+      if (r.status === 'cancelled') return;
+      const fee = r.tuition_fee;
+      const day0 = addDays(r.registered_at.slice(0, 10), int(0, 10));
+      const round = (x) => Math.round(x / 500) * 500;
+      const scenario = weighted([['full', 45], ['plan', 35], ['requested', 5], ['partial', 10], ['none', 5]]);
+      if (scenario === 'full') {
+        if (chance(0.15)) { const first = round(fee * 0.5); pay(i, first, day0); pay(i, fee - first, addDays(day0, int(15, 45))); }
+        else pay(i, fee, day0);
+        if (chance(0.03)) pay(i, round(fee * 0.2), day0, { voided_at: `${day0}T17:00:00Z`, void_reason: 'Erreur de saisie (montant)' });
+      } else if (scenario === 'plan' || scenario === 'requested') {
+        const amounts = [round(fee * 0.4), round(fee * 0.3)];
+        amounts.push(fee - amounts[0] - amounts[1]);
+        planOf[i] = {
+          status: scenario === 'plan' ? 'approved' : 'requested',
+          reason: pick(['Difficultés financières passagères', 'Famille nombreuse', 'Revenus agricoles saisonniers', 'Parent fonctionnaire (salaire mensuel)', null]),
+          instalments: amounts.map((amount, n) => ({ number: n + 1, due_date: due[n], amount })),
+        };
+        if (scenario === 'requested') { if (chance(0.5)) pay(i, round(fee * 0.2), day0); return; }
+        const behaviour = weighted([['on_time', 70], ['late', 18], ['stopped', 12]]);
+        amounts.forEach((amount, n) => {
+          if (behaviour === 'stopped' && n > 0) return;
+          const date = n === 0 ? day0 : addDays(due[n], behaviour === 'late' ? int(10, 40) : int(-12, 3));
+          // "stopped" families paid only part of the first instalment
+          pay(i, behaviour === 'stopped' ? round(amount * pick([0, 0.5, 0.75])) : amount, date);
+        });
+      } else if (scenario === 'partial') {
+        pay(i, round(fee * (0.2 + rand() * 0.6)), day0);
+      }
+    });
+
+    const paidOf = new Array(regRows.length).fill(0);
+    for (const p of payRows) if (!p.voided_at) paidOf[p.reg] += p.amount;
+    regRows.forEach((r, i) => { if (r.status !== 'cancelled' && paidOf[i] >= r.tuition_fee) r.status = 'confirmed'; });
+    const regIds = (await insertMany(client, 'registrations', regRows)).map((r) => r.id);
+
+    // Instalment plans and their schedules
+    const planRegs = planOf.map((p, i) => (p ? i : -1)).filter((i) => i >= 0);
+    const planIds = (await insertMany(client, 'instalment_plans', planRegs.map((i) => ({
+      registration_id: regIds[i], status: planOf[i].status, reason: planOf[i].reason,
+      requested_at: regRows[i].registered_at, decided_at: planOf[i].status === 'approved' ? addDays(regRows[i].registered_at.slice(0, 10), int(1, 5)) : null,
+    })))).map((r) => r.id);
+    await insertMany(client, 'instalments', planRegs.flatMap((i, k) =>
+      planOf[i].instalments.map((inst) => ({ plan_id: planIds[k], ...inst }))), null);
+
+    // Payments in date order, so receipt numbers are chronological
+    payRows.sort((a, b) => a.paid_at.localeCompare(b.paid_at));
+    await insertMany(client, 'payments', payRows.map(({ reg, ...p }, n) => ({
+      registration_id: regIds[reg],
+      receipt_number: `REC-${p.paid_at.slice(0, 4)}-${String(n + 1).padStart(6, '0')}`,
+      ...p,
+      voided_at: p.voided_at ?? null,
+      void_reason: p.void_reason ?? null,
+    })), null);
+    await client.query('SELECT setval($1, $2)', ['receipt_seq', payRows.length || 1]);
 
     // --- Grades on /20 for every exam of the year: each student has a base level,
     //     a strength/weakness per course, and some noise per exam ---
@@ -399,7 +480,8 @@ async function populate() {
 
     await client.query('COMMIT');
     console.log(`Done: ${teacherRows.length} teachers, ${courseRows.length} courses, ${classes.length} classes, ` +
-      `${studentRows.length + formerRows.length} students, ${guardianRows.length} guardians, ${regRows.length} registrations, ${gradeRows.length} grades.`);
+      `${studentRows.length + formerRows.length} students, ${guardianRows.length} guardians, ${regRows.length} registrations, ${gradeRows.length} grades, ` +
+      `${planIds.length} instalment plans, ${payRows.length} payments.`);
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

@@ -5,6 +5,9 @@ const TONES = {
   pending: 'warning', on_leave: 'warning', transferred: 'warning',
   cancelled: 'danger', expelled: 'danger', left: 'neutral',
   graduated: 'info',
+  // finances
+  paid: 'success', approved: 'success', partial: 'warning', requested: 'info',
+  unpaid: 'danger', overdue: 'danger', rejected: 'danger', voided: 'neutral', upcoming: 'neutral',
 };
 defineProps({ value: String, label: String });
 </script>

@@ -11,7 +11,7 @@ import AppIcon from './AppIcon.vue';
 /**
  * Generic list + form page driven by a `fields` config:
  * [{ key, label, type?: 'text'|'date'|'number'|'email'|'textarea'|..., required?, default?,
- *    options?: [{value,label}], section?, badge?, filter?, list?: false, form?: false }]
+ *    options?: [{value,label}], section?, badge?, filter?, list?: false, form?: false, format?: (value) => string }]
  * Fields with `filter: true` (and options) get a filter dropdown in the toolbar.
  * `identity(row)` → { name, sub?, photo? } renders a leading avatar + name column.
  * `rowLink(row)` → route location makes that name a link (e.g. to a detail page).
@@ -83,7 +83,7 @@ async function confirmRemove(row) {
 
 const isFiltered = computed(() => !!search.value || Object.values(filters).some(Boolean));
 
-const label = (f, row) => f.options?.find((o) => o.value == row[f.key])?.label ?? row[f.key];
+const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o) => o.value == row[f.key])?.label ?? row[f.key]);
 </script>
 
 <template>

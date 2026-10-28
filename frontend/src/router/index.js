@@ -10,6 +10,10 @@ const routes = [
   { path: '/classes', component: () => import('../views/ClassesView.vue') },
   { path: '/classes/:id', component: () => import('../views/ClassDetailView.vue'), props: true },
   { path: '/academic-years', component: () => import('../views/AcademicYearsView.vue') },
+  { path: '/finances', component: () => import('../views/FinanceAccountsView.vue') },
+  { path: '/finances/payments', component: () => import('../views/PaymentsView.vue') },
+  { path: '/finances/reports', component: () => import('../views/FinanceReportView.vue') },
+  { path: '/finances/receipts/:id', component: () => import('../views/ReceiptView.vue'), props: true },
   { path: '/courses', component: () => import('../views/CoursesView.vue') },
 ];
 

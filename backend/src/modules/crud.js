@@ -8,8 +8,9 @@ import { paginatedList, buildWhere } from '../db/paginate.js';
  * `fields` is a whitelist: only these columns can be written (prevents mass assignment).
  * List: `?page=` returns a paginated envelope { data, total, page, pageSize, totalPages };
  * without it, the full array (used by dropdowns). Both accept `?search=` and the `filters` columns.
+ * `afterUpdate(row)`, when given, runs after a successful PUT.
  */
-export function crudRouter({ table, fields, required = [], orderBy = 'id', listSql, searchColumns = [], filters = [] }) {
+export function crudRouter({ table, fields, required = [], orderBy = 'id', listSql, searchColumns = [], filters = [], afterUpdate }) {
   const router = Router();
 
   // Empty form inputs ('') become NULL so optional columns stay valid
@@ -53,6 +54,7 @@ export function crudRouter({ table, fields, required = [], orderBy = 'id', listS
       `UPDATE ${table} SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(',')} WHERE id = $${cols.length + 1} RETURNING *`,
       [...Object.values(data), req.params.id]);
     if (!rows[0]) throw new HttpError(404, 'Not found');
+    if (afterUpdate) await afterUpdate(rows[0]);
     res.json(rows[0]);
   });
 

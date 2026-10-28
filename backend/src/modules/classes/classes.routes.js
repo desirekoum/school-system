@@ -2,11 +2,26 @@ import { crudRouter } from '../crud.js';
 import { query } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
 import { paginatedList } from '../../db/paginate.js';
+import { tx, syncStatus } from '../finances/finances.service.js';
 import { getGradebook, saveGradebook, classResults } from '../grades/grades.service.js';
+
+/**
+ * A new class fee also applies to registrations of the class that have no payment and no plan yet.
+ * Once a student has paid something or has a plan, their fee is frozen.
+ */
+async function applyFeeToUnpaid(cls) {
+  const { rows } = await query(`
+    UPDATE registrations r SET tuition_fee = $2
+    WHERE r.class_id = $1 AND r.tuition_fee <> $2
+      AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.registration_id = r.id AND p.voided_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM instalment_plans ip WHERE ip.registration_id = r.id)
+    RETURNING r.id`, [cls.id, cls.tuition_fee]);
+  await tx(async (client) => { for (const r of rows) await syncStatus(client, r.id); });
+}
 
 const router = crudRouter({
   table: 'classes',
-  fields: ['name', 'level', 'academic_year', 'capacity', 'homeroom_teacher_id'],
+  fields: ['name', 'level', 'academic_year', 'capacity', 'homeroom_teacher_id', 'tuition_fee'],
   required: ['name', 'level', 'academic_year'],
   // LEFT JOIN keeps classes without a homeroom teacher; subquery counts confirmed students
   listSql: `
@@ -16,6 +31,7 @@ const router = crudRouter({
   orderBy: 'academic_year DESC, name',
   searchColumns: ['name', 'level', 'academic_year', 'homeroom_teacher'],
   filters: ['level', 'academic_year'],
+  afterUpdate: applyFeeToUnpaid,
 });
 
 // Courses taught in a class
