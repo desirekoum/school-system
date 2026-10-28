@@ -5,18 +5,18 @@ import { GENDERS, TEACHER_STATUSES, CONTRACT_TYPES } from '../config/options';
 
 const fields = [
   { section: 'Identity', key: 'employee_number', label: 'Employee no.' },
-  { section: 'Identity', key: 'last_name', label: 'Last name', required: true },
-  { section: 'Identity', key: 'first_name', label: 'First name', required: true },
+  { section: 'Identity', key: 'last_name', label: 'Last name', required: true, list: false },
+  { section: 'Identity', key: 'first_name', label: 'First name', required: true, list: false },
   { section: 'Identity', key: 'gender', label: 'Gender', options: GENDERS, list: false },
   { section: 'Identity', key: 'birth_date', label: 'Birth date', type: 'date', list: false },
   { section: 'Identity', key: 'photo_url', label: 'Photo URL', type: 'url', list: false },
 
-  { section: 'Contact', key: 'email', label: 'Email', type: 'email', required: true },
+  { section: 'Contact', key: 'email', label: 'Email', type: 'email', required: true, list: false },
   { section: 'Contact', key: 'phone', label: 'Phone' },
   { section: 'Contact', key: 'address', label: 'Address', list: false },
 
   { section: 'Job', key: 'specialty', label: 'Specialty' },
-  { section: 'Job', key: 'status', label: 'Status', options: TEACHER_STATUSES, required: true, default: 'active' },
+  { section: 'Job', key: 'status', label: 'Status', options: TEACHER_STATUSES, required: true, default: 'active', badge: true },
   { section: 'Job', key: 'contract_type', label: 'Contract', options: CONTRACT_TYPES },
   { section: 'Job', key: 'hire_date', label: 'Hire date', type: 'date', list: false },
   { section: 'Job', key: 'qualifications', label: 'Qualifications / diplomas', type: 'textarea', list: false },
@@ -25,8 +25,11 @@ const fields = [
   { section: 'Pay', key: 'hourly_rate', label: 'Hourly rate', type: 'number', step: '0.01', list: false },
   { section: 'Pay', key: 'bank_account', label: 'Bank account', list: false },
 ];
+
+const identity = (t) => ({ name: `${t.first_name} ${t.last_name}`, sub: t.email, photo: t.photo_url });
 </script>
 
 <template>
-  <CrudPage title="Teachers" :api="teachersApi" :fields="fields" />
+  <CrudPage title="Teachers" singular="teacher" subtitle="Teaching staff, contracts and pay details."
+            :api="teachersApi" :fields="fields" :identity="identity" />
 </template>
