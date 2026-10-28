@@ -10,6 +10,7 @@ Modules (v0.1): students, registrations, teachers, classes, courses.
 teachers 1───* classes (homeroom_teacher_id)
 classes  *───* courses  via class_courses (+ teacher_id: who teaches it)
 students 1───* registrations *───1 classes
+students *───* guardians via student_guardians (+ relation, is_primary)
 ```
 
 - `registrations` has `UNIQUE (student_id, academic_year)`: one class per student per year.
@@ -48,4 +49,6 @@ cd frontend && npm i && npm run dev                                            #
 | `/api/students`, `/api/teachers`, `/api/courses`, `/api/classes` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
 | `/api/classes/:id/courses` | `GET`, `POST {course_id, teacher_id}`, `DELETE /:courseId` |
 | `/api/classes/:id/students` | `GET` |
+| `/api/guardians` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
+| `/api/students/:id/guardians` | `GET`, `POST {guardian_id \| new guardian fields, relation, is_primary}`, `DELETE /:guardianId` |
 | `/api/registrations` | `GET /`, `POST {student_id, class_id}`, `PATCH /:id/status {status}`, `DELETE /:id` |

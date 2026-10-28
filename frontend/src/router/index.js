@@ -4,6 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 const routes = [
   { path: '/', redirect: '/students' },
   { path: '/students', component: () => import('../views/StudentsView.vue') },
+  { path: '/students/:id', component: () => import('../views/StudentDetailView.vue'), props: true },
   { path: '/registrations', component: () => import('../views/RegistrationsView.vue') },
   { path: '/teachers', component: () => import('../views/TeachersView.vue') },
   { path: '/classes', component: () => import('../views/ClassesView.vue') },
