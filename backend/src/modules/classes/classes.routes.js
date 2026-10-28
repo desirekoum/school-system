@@ -2,6 +2,7 @@ import { crudRouter } from '../crud.js';
 import { query } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
 import { paginatedList } from '../../db/paginate.js';
+import { getGradebook, saveGradebook, classResults } from '../grades/grades.service.js';
 
 const router = crudRouter({
   table: 'classes',
@@ -59,6 +60,17 @@ router.get('/:id/students', async (req, res) => {
   }
   const { rows } = await query(`${ROSTER_SQL} ORDER BY s.last_name, s.first_name`, [req.params.id]);
   res.json(rows);
+});
+
+// Grade entry for one exam + course (GET roster with scores, PUT the whole column)
+router.get('/:id/gradebook', async (req, res) => res.json(await getGradebook(req.params.id, req.query)));
+router.put('/:id/gradebook', async (req, res) => res.json(await saveGradebook(req.params.id, req.body)));
+
+// Averages and ranks: ?trimester=1|2|3, or nothing for the whole year
+router.get('/:id/results', async (req, res) => {
+  const t = req.query.trimester ? Number(req.query.trimester) : null;
+  if (t !== null && ![1, 2, 3].includes(t)) throw new HttpError(400, 'trimester must be 1, 2 or 3');
+  res.json(await classResults(req.params.id, t));
 });
 
 export default router;

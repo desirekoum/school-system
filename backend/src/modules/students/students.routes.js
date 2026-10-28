@@ -1,6 +1,7 @@
 import { crudRouter } from '../crud.js';
 import { query, pool } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
+import { reportCard } from '../grades/grades.service.js';
 
 const router = crudRouter({
   table: 'students',
@@ -68,5 +69,7 @@ router.delete('/:id/guardians/:guardianId', async (req, res) => {
   await query('DELETE FROM student_guardians WHERE student_id = $1 AND guardian_id = $2', [req.params.id, req.params.guardianId]);
   res.status(204).end();
 });
+
+router.get('/:id/report-card', async (req, res) => res.json(await reportCard(req.params.id, req.query.academic_year)));
 
 export default router;

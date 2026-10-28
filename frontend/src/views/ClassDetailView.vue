@@ -1,6 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { classesApi, coursesApi, teachersApi } from '../api/http';
+import { useRoute, useRouter } from 'vue-router';
+import { classesApi, coursesApi, teachersApi, academicYearsApi } from '../api/http';
+import GradeEntry from '../components/GradeEntry.vue';
+import ClassResults from '../components/ClassResults.vue';
+import { flattenExams } from '../config/grading';
 import PageHeader from '../components/PageHeader.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import Avatar from '../components/Avatar.vue';
@@ -21,11 +25,30 @@ const error = ref('');
 const { items: students, total: studentTotal, totalPages, page, pageSize, loading: rosterLoading } =
   usePaginatedList((params) => classesApi.students(props.id, params));
 
+// Active tab lives in the URL (?tab=grades) so it survives a reload and can be shared
+const route = useRoute();
+const router = useRouter();
+const TABS = [
+  { key: 'overview', label: 'Overview', icon: 'classes' },
+  { key: 'grades', label: 'Grade entry', icon: 'pencil' },
+  { key: 'results', label: 'Results', icon: 'award' },
+];
+const tab = computed({
+  get: () => (TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'overview'),
+  set: (key) => router.replace({ query: { ...route.query, tab: key === 'overview' ? undefined : key } }),
+});
+
+const year = ref(null);
+const exams = computed(() => flattenExams(year.value));
+
 const totalHours = computed(() => courses.value.reduce((sum, c) => sum + c.hours_per_week, 0));
 
 async function load() {
   // Promise.all runs the requests in parallel
   [cls.value, courses.value] = await Promise.all([classesApi.get(props.id), classesApi.courses(props.id)]);
+  if (year.value?.name !== cls.value.academic_year) {
+    year.value = (await academicYearsApi.list()).find((y) => y.name === cls.value.academic_year) ?? null;
+  }
 }
 
 onMounted(async () => {
@@ -55,6 +78,20 @@ async function unassign(courseId) {
     <PageHeader :title="cls.name" :subtitle="`${cls.level} · ${cls.academic_year}`" :back="{ to: '/classes', label: 'Classes' }" />
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
 
+    <nav class="tabs-bar">
+      <button v-for="t in TABS" :key="t.key" :class="{ active: tab === t.key }" @click="tab = t.key">
+        <AppIcon :name="t.icon" size="16" />{{ t.label }}
+      </button>
+    </nav>
+
+    <template v-if="tab === 'grades'">
+      <GradeEntry v-if="exams.length" :class-id="id" :exams="exams" :courses="courses" />
+      <div v-else class="card empty"><p>The academic year {{ cls.academic_year }} has no exams. Create it in <RouterLink to="/academic-years" class="link">Academic years</RouterLink>.</p></div>
+    </template>
+
+    <ClassResults v-else-if="tab === 'results'" :class-id="id" />
+
+    <template v-else>
     <div class="stats">
       <div class="card stat"><span class="stat-icon"><AppIcon name="students" size="22" /></span>
         <div><p class="muted small">Students</p><p class="stat-value">{{ studentTotal }} <small>/ {{ cls.capacity }}</small></p></div></div>
@@ -109,5 +146,6 @@ async function unassign(courseId) {
         <PaginationBar v-if="studentTotal > pageSize" v-model:page="page" v-model:page-size="pageSize" :total="studentTotal" :total-pages="totalPages" />
       </div>
     </div>
+    </template>
   </section>
 </template>
