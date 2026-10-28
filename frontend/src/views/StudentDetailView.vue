@@ -7,6 +7,7 @@ import SlideOver from '../components/SlideOver.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import Avatar from '../components/Avatar.vue';
 import AppIcon from '../components/AppIcon.vue';
+import ReportCard from '../components/ReportCard.vue';
 
 const props = defineProps({ id: String });
 
@@ -90,6 +91,8 @@ async function removeGuardian(g) {
         </dl>
       </div>
     </div>
+
+    <ReportCard :student-id="id" />
 
     <div class="card">
       <div class="card-header">

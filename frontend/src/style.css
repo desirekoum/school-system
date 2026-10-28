@@ -262,3 +262,44 @@ dl.info dd { margin: .15rem 0 0; font-weight: 500; white-space: pre-line; }
 .table-wrap.is-loading { opacity: .55; transition: opacity .15s; }
 .filters { display: flex; gap: .5rem; flex-wrap: wrap; }
 .filters select { width: auto; min-width: 150px; }
+
+/* ============ Grades ============ */
+.score-high { color: var(--success); font-weight: 700; }
+.score-pass { color: var(--success); font-weight: 600; }
+.score-fail { color: var(--danger); font-weight: 600; }
+.tabs-bar { display: flex; gap: .25rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tabs-bar button { display: inline-flex; align-items: center; gap: .45rem; padding: .65rem 1rem; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent; font: inherit; font-weight: 500; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tabs-bar button:hover { color: var(--text); }
+.tabs-bar button.active { color: var(--primary); border-bottom-color: var(--primary); }
+.grade-input { width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
+.grade-input.invalid { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-bg); }
+.grade-input.dirty { background: var(--blue-50); border-color: var(--blue-200); }
+.comment-input { min-width: 180px; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table th.num { text-align: right; }
+.rank { display: inline-grid; place-items: center; min-width: 30px; height: 26px; padding: 0 .4rem; border-radius: 6px; background: var(--gray-100); font-weight: 600; font-size: .8rem; }
+.rank.top { background: var(--blue-600); color: #fff; }
+.sticky-col { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.table tbody tr:hover .sticky-col { background: var(--gray-25); }
+.report th, .report td { text-align: center; }
+.report th:first-child, .report td:first-child { text-align: left; }
+.report .avg-col { background: var(--blue-50); font-weight: 600; }
+.report tfoot td { border-top: 2px solid var(--border); font-weight: 600; background: var(--gray-25); }
+.save-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding: .85rem 1.25rem; border-top: 1px solid var(--border); background: var(--gray-25); }
+.year-card .card-header { flex-wrap: wrap; }
+.trimester-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; padding: 1.25rem; }
+.trimester { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; background: var(--gray-25); }
+.trimester h3 { font-size: .9rem; margin-bottom: .75rem; }
+.trimester .field { margin-bottom: .6rem; }
+.trimester .field input { height: 34px; }
+.pill { display: inline-flex; align-items: center; padding: .15rem .6rem; border-radius: 99px; background: var(--gray-100); color: var(--gray-700); font-size: .75rem; font-weight: 600; }
+.pill.current { background: var(--blue-600); color: #fff; }
+
+@media print {
+  .sidebar, .topbar, .app-footer, .page-actions, .tabs-bar, .no-print, .back-link { display: none !important; }
+  .main { margin: 0; }
+  .content { padding: 0; max-width: none; }
+  .card { box-shadow: none; break-inside: avoid; }
+  body { background: #fff; }
+}
+.form-grid > .wide { grid-column: 1 / -1; }

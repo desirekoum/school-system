@@ -9,6 +9,7 @@ const routes = [
   { path: '/teachers', component: () => import('../views/TeachersView.vue') },
   { path: '/classes', component: () => import('../views/ClassesView.vue') },
   { path: '/classes/:id', component: () => import('../views/ClassDetailView.vue'), props: true },
+  { path: '/academic-years', component: () => import('../views/AcademicYearsView.vue') },
   { path: '/courses', component: () => import('../views/CoursesView.vue') },
 ];
 

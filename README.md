@@ -11,7 +11,14 @@ teachers 1───* classes (homeroom_teacher_id)
 classes  *───* courses  via class_courses (+ teacher_id: who teaches it)
 students 1───* registrations *───1 classes
 students *───* guardians via student_guardians (+ relation, is_primary)
+academic_years 1───3 trimesters 1───2 exams 1───* grades (student, course, class, score /20)
+classes.academic_year, registrations.academic_year ──> academic_years.name
 ```
+
+- **Grading**: course average = mean of the exams of the period (trimester or year).
+  General average = course averages weighted by coefficient. Rank uses `RANK()` (ties share a rank). Pass mark 10/20.
+- Creating an academic year creates its 3 trimesters and 6 exams. Only one year can be current (partial unique index).
+- Migration `003` backfills academic years from existing classes and registrations.
 
 - `registrations` has `UNIQUE (student_id, academic_year)`: one class per student per year.
 - Registration runs in a transaction with `SELECT … FOR UPDATE` on the class to enforce `capacity` safely under concurrency.
@@ -66,6 +73,11 @@ is seeded, so every run gives the same data.
 | `/api/guardians` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
 | `/api/students/:id/guardians` | `GET`, `POST {guardian_id \| new guardian fields, relation, is_primary}`, `DELETE /:guardianId` |
 | `/api/registrations` | `GET /`, `POST {student_id, class_id}`, `PATCH /:id/status {status}`, `DELETE /:id` |
+| `/api/academic-years` | `GET /`, `GET /current`, `GET /:id`, `POST /`, `PUT /:id`, `POST /:id/current`, `DELETE /:id` |
+| `/api/academic-years/trimesters/:id`, `/exams/:id` | `PUT {start_date, end_date}`, `PUT {exam_date}` |
+| `/api/classes/:id/gradebook` | `GET ?exam_id&course_id`, `PUT {exam_id, course_id, grades: [{student_id, score, comment}]}` (null score deletes) |
+| `/api/classes/:id/results` | `GET ?trimester=1\|2\|3` (omit for the full year) |
+| `/api/students/:id/report-card` | `GET ?academic_year=` |
 
 **Pagination** — every list endpoint accepts `?page=1&pageSize=50` (default 50, max 100) and returns
 `{ data, total, page, pageSize, totalPages }` (registrations also return per-status `counts`).

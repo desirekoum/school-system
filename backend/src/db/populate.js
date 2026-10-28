@@ -5,9 +5,11 @@
  *   npm run populate              # refuses if data already exists
  *   npm run populate -- --reset   # wipes all tables first
  *
+ * Also creates the academic year (3 trimesters × 2 exams) and a full year of grades.
  * Uses a seeded random generator, so every run produces the same data set.
  */
 import { pool } from './pool.js';
+import { splitInTrimesters } from '../modules/academic-years/academic-years.service.js';
 
 const RESET = process.argv.includes('--reset');
 
@@ -28,6 +30,8 @@ const weighted = (pairs) => {
   for (const [v, w] of pairs) if ((r -= w) < 0) return v;
   return pairs[0][0];
 };
+// Normal distribution (Box-Muller) for realistic grade spreads
+const normal = (mean, sd) => mean + sd * Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
 const isoDate = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 const randomDate = (fromYear, toYear) => isoDate(int(fromYear, toYear), int(1, 12), int(1, 28));
 const slug = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
@@ -173,8 +177,8 @@ async function populate() {
     await client.query('BEGIN');
     if (RESET) {
       // RESTART IDENTITY resets SERIAL counters; CASCADE empties dependent tables too
-      await client.query(`TRUNCATE registrations, class_courses, student_guardians, guardians, classes, courses, students, teachers
-                          RESTART IDENTITY CASCADE`);
+      await client.query(`TRUNCATE grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
+                          classes, academic_years, courses, students, teachers RESTART IDENTITY CASCADE`);
     }
 
     // --- Teachers: enough to cover every course in every class ---
@@ -216,6 +220,26 @@ async function populate() {
     // --- Courses ---
     const courseRows = COURSES.map(([code, name, coefficient, hours_per_week]) => ({ code, name, coefficient, hours_per_week, description: `Programme officiel de ${name.toLowerCase()}.` }));
     const courseIds = (await insertMany(client, 'courses', courseRows)).map((r) => r.id);
+
+    // --- Academic year: 3 trimesters × 2 exams (exam dates near the end of each half-trimester) ---
+    const { rows: [year] } = await client.query(
+      `INSERT INTO academic_years (name, start_date, end_date, is_current) VALUES ($1, $2, $3, true)
+       ON CONFLICT (name) DO UPDATE SET is_current = true RETURNING id`,
+      [ACADEMIC_YEAR, `${START_YEAR}-09-01`, `${START_YEAR + 1}-06-30`]);
+    await client.query('UPDATE academic_years SET is_current = (id = $1)', [year.id]);
+    await client.query('DELETE FROM trimesters WHERE academic_year_id = $1', [year.id]);
+    const examIds = [];
+    for (const t of splitInTrimesters(`${START_YEAR}-09-01`, `${START_YEAR + 1}-06-30`)) {
+      const { rows: [tri] } = await client.query(
+        'INSERT INTO trimesters (academic_year_id, number, start_date, end_date) VALUES ($1, $2, $3, $4) RETURNING id',
+        [year.id, t.number, t.start_date, t.end_date]);
+      const mid = new Date((new Date(t.start_date).getTime() + new Date(t.end_date).getTime()) / 2);
+      for (const [n, date] of [[1, new Date(mid.getTime() - 7 * 86400000)], [2, new Date(new Date(t.end_date).getTime() - 10 * 86400000)]]) {
+        const { rows: [exam] } = await client.query(
+          'INSERT INTO exams (trimester_id, number, exam_date) VALUES ($1, $2, $3) RETURNING id', [tri.id, n, date.toISOString().slice(0, 10)]);
+        examIds.push(exam.id);
+      }
+    }
 
     // --- Classes: 7 levels × 3 sections, large classes as is common in the region ---
     const classRows = [];
@@ -339,6 +363,27 @@ async function populate() {
     }));
     await insertMany(client, 'registrations', regRows, null);
 
+    // --- Grades on /20 for every exam of the year: each student has a base level,
+    //     a strength/weakness per course, and some noise per exam ---
+    const coursesByClass = {};
+    for (const cc of ccRows) (coursesByClass[cc.class_id] ??= []).push(cc.course_id);
+    const gradeRows = [];
+    studentIds.forEach((sid, i) => {
+      if (regRows[i].status === 'cancelled') return;
+      const classId = regRows[i].class_id;
+      const level = normal(11, 2.8);
+      for (const courseId of coursesByClass[classId]) {
+        const affinity = normal(0, 2);
+        examIds.forEach((examId, e) => {
+          const progress = (e - 2.5) * normal(0.15, 0.2); // some improve over the year, some decline
+          const raw = level + affinity + progress + normal(0, 1.8);
+          const score = Math.round(Math.min(20, Math.max(0, raw)) * 4) / 4; // quarter points
+          gradeRows.push({ exam_id: examId, class_id: classId, course_id: courseId, student_id: sid, score });
+        });
+      }
+    });
+    await insertMany(client, 'grades', gradeRows, null);
+
     // A few former students (graduated / transferred) with no current registration
     const formerRows = Array.from({ length: 40 }, (_, i) => {
       const p = person();
@@ -354,7 +399,7 @@ async function populate() {
 
     await client.query('COMMIT');
     console.log(`Done: ${teacherRows.length} teachers, ${courseRows.length} courses, ${classes.length} classes, ` +
-      `${studentRows.length + formerRows.length} students, ${guardianRows.length} guardians, ${regRows.length} registrations.`);
+      `${studentRows.length + formerRows.length} students, ${guardianRows.length} guardians, ${regRows.length} registrations, ${gradeRows.length} grades.`);
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

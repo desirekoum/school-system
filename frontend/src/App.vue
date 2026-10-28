@@ -11,6 +11,7 @@ const nav = [
     { to: '/teachers', label: 'Teachers', icon: 'teachers' },
   ] },
   { group: 'Academics', items: [
+    { to: '/academic-years', label: 'Academic years', icon: 'calendar' },
     { to: '/registrations', label: 'Registrations', icon: 'registrations' },
     { to: '/classes', label: 'Classes', icon: 'classes' },
     { to: '/courses', label: 'Courses', icon: 'courses' },
