@@ -7,7 +7,7 @@ import { tx, recordPayment, requestPlan, syncStatus } from '../finances/finances
  * cannot both pass the capacity check (avoids a race condition).
  *
  * The class tuition fee is copied onto the registration. The registration stays "pending"
- * until the fee is fully paid; an optional first `payment` and instalment `plan` can be
+ * until the fee is fully paid, or the first instalment of an approved plan is; an optional first `payment` and instalment `plan` can be
  * recorded in the same transaction (all or nothing).
  */
 export async function register({ student_id, class_id, payment, plan }) {
@@ -43,7 +43,7 @@ export async function register({ student_id, class_id, payment, plan }) {
 
 /**
  * Status changes: cancelling is always allowed. Otherwise the status follows the payments
- * (confirmed = fully paid), so "confirmed" is refused while a balance remains.
+ * (confirmed = fully paid, or first instalment of an approved plan paid), so it can't be forced.
  */
 export async function setStatus(id, status) {
   return tx(async (client) => {
@@ -52,12 +52,12 @@ export async function setStatus(id, status) {
     if (status === 'cancelled') {
       await client.query("UPDATE registrations SET status = 'cancelled' WHERE id = $1", [id]);
     } else {
-      const { rows: [{ balance }] } = await client.query(
-        'SELECT balance FROM registration_balances WHERE registration_id = $1', [id]);
-      if (status === 'confirmed' && balance > 0) {
-        throw new HttpError(409, `A registration is complete only once the tuition is paid: ${balance} FCFA remaining`);
+      const { rows: [{ balance, confirmable }] } = await client.query(
+        'SELECT balance, confirmable FROM registration_balances WHERE registration_id = $1', [id]);
+      if (status === 'confirmed' && !confirmable) {
+        throw new HttpError(409, `A registration is complete once the tuition, or the first instalment of an approved plan, is paid: ${balance} FCFA remaining`);
       }
-      if (status === 'pending' && balance <= 0) throw new HttpError(409, 'Tuition is fully paid: the registration is confirmed');
+      if (status === 'pending' && confirmable) throw new HttpError(409, 'The tuition (or first instalment) is paid: the registration is confirmed');
       await client.query('UPDATE registrations SET status = $2 WHERE id = $1', [id, status]);
     }
     const { rows: [saved] } = await client.query('SELECT * FROM registrations WHERE id = $1', [id]);
