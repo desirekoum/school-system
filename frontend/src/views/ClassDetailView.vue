@@ -11,8 +11,10 @@ import Avatar from '../components/Avatar.vue';
 import AppIcon from '../components/AppIcon.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import { usePaginatedList } from '../composables/usePaginatedList';
+import { useAuth } from '../composables/useAuth';
 
 const props = defineProps({ id: String }); // injected from the route via `props: true`
+const { user, can } = useAuth();
 
 const cls = ref(null);
 const courses = ref([]);
@@ -30,9 +32,9 @@ const route = useRoute();
 const router = useRouter();
 const TABS = [
   { key: 'overview', label: 'Overview', icon: 'classes' },
-  { key: 'grades', label: 'Grade entry', icon: 'pencil' },
-  { key: 'results', label: 'Results', icon: 'award' },
-];
+  { key: 'grades', label: 'Grade entry', icon: 'pencil', perm: 'grades:write' },
+  { key: 'results', label: 'Results', icon: 'award', perm: 'grades:read' },
+].filter((t) => !t.perm || can(t.perm));
 const tab = computed({
   get: () => (TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'overview'),
   set: (key) => router.replace({ query: { ...route.query, tab: key === 'overview' ? undefined : key } }),
@@ -40,6 +42,11 @@ const tab = computed({
 
 const year = ref(null);
 const exams = computed(() => flattenExams(year.value));
+
+// A teacher only gets the courses they teach in this class (the API refuses the others anyway)
+const gradableCourses = computed(() =>
+  user.value.role === 'teacher' ? courses.value.filter((c) => c.teacher_id === user.value.teacher_id) : courses.value);
+const canAssign = computed(() => can('academics:write') && can('staff:read'));
 
 const totalHours = computed(() => courses.value.reduce((sum, c) => sum + c.hours_per_week, 0));
 
@@ -52,7 +59,7 @@ async function load() {
 }
 
 onMounted(async () => {
-  [allCourses.value, teachers.value] = await Promise.all([coursesApi.list(), teachersApi.list()]);
+  if (canAssign.value) [allCourses.value, teachers.value] = await Promise.all([coursesApi.list(), teachersApi.list()]);
   await load();
 });
 
@@ -85,7 +92,7 @@ async function unassign(courseId) {
     </nav>
 
     <template v-if="tab === 'grades'">
-      <GradeEntry v-if="exams.length" :class-id="id" :exams="exams" :courses="courses" />
+      <GradeEntry v-if="exams.length" :class-id="id" :exams="exams" :courses="gradableCourses" />
       <div v-else class="card empty"><p>The academic year {{ cls.academic_year }} has no exams. Create it in <RouterLink to="/academic-years" class="link">Academic years</RouterLink>.</p></div>
     </template>
 
@@ -104,7 +111,7 @@ async function unassign(courseId) {
     <div class="grid-2">
       <div class="card">
         <div class="card-header"><h2>Courses &amp; teachers</h2></div>
-        <form class="inline-form" @submit.prevent="assignCourse">
+        <form v-if="canAssign" class="inline-form" @submit.prevent="assignCourse">
           <select v-model="assign.course_id" required>
             <option value="">Course…</option>
             <option v-for="c in allCourses" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -123,7 +130,7 @@ async function unassign(courseId) {
                 <td><div class="strong">{{ c.name }}</div><div class="muted small">{{ c.code }} · {{ c.hours_per_week }} h/week</div></td>
                 <td>{{ c.coefficient }}</td>
                 <td>{{ c.teacher ?? '—' }}</td>
-                <td class="right"><button class="icon-btn danger" title="Remove" @click="unassign(c.id)"><AppIcon name="trash" size="16" /></button></td>
+                <td class="right"><button v-if="canAssign" class="icon-btn danger" title="Remove" @click="unassign(c.id)"><AppIcon name="trash" size="16" /></button></td>
               </tr>
             </tbody>
           </table>

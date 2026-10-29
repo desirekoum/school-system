@@ -80,7 +80,15 @@ router.get('/:id/students', async (req, res) => {
 
 // Grade entry for one exam + course (GET roster with scores, PUT the whole column)
 router.get('/:id/gradebook', async (req, res) => res.json(await getGradebook(req.params.id, req.query)));
-router.put('/:id/gradebook', async (req, res) => res.json(await saveGradebook(req.params.id, req.body)));
+router.put('/:id/gradebook', async (req, res) => {
+  // A teacher account may only grade the courses it teaches (row-level check on top of grades:write)
+  if (req.user.role === 'teacher') {
+    const { rowCount } = await query('SELECT 1 FROM class_courses WHERE class_id = $1 AND course_id = $2 AND teacher_id = $3',
+      [req.params.id, req.body.course_id, req.user.teacher_id]);
+    if (!rowCount) throw new HttpError(403, 'You can only enter grades for the courses you teach');
+  }
+  res.json(await saveGradebook(req.params.id, req.body));
+});
 
 // Averages and ranks: ?trimester=1|2|3, or nothing for the whole year
 router.get('/:id/results', async (req, res) => {

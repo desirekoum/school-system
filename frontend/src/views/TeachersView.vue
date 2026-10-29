@@ -1,5 +1,6 @@
 <script setup>
 import CrudPage from '../components/CrudPage.vue';
+import { useAuth } from '../composables/useAuth';
 import { teachersApi } from '../api/http';
 import { GENDERS, TEACHER_STATUSES, CONTRACT_TYPES } from '../config/options';
 
@@ -27,9 +28,11 @@ const fields = [
 ];
 
 const identity = (t) => ({ name: `${t.first_name} ${t.last_name}`, sub: t.email, photo: t.photo_url });
+
+const { can } = useAuth();
 </script>
 
 <template>
   <CrudPage title="Teachers" singular="teacher" subtitle="Teaching staff, contracts and pay details."
-            :api="teachersApi" :fields="fields" :identity="identity" />
+            :api="teachersApi" :readonly="!can('staff:write')" :fields="fields" :identity="identity" />
 </template>

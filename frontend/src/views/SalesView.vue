@@ -10,6 +10,9 @@ import { salesApi, academicYearsApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { money, METHODS, methodLabel } from '../config/finance';
 import { downloadCsv } from '../utils/csv';
+import { useAuth } from '../composables/useAuth';
+
+const { can } = useAuth();
 
 const years = ref([]);
 const { items, total, totalPages, page, pageSize, search, filters, loading, error, meta, load } = usePaginatedList(
@@ -51,7 +54,7 @@ const receiptUrl = (id) => `/finances/sales/${id}/receipt`;
   <section>
     <PageHeader title="Sales" subtitle="Uniforms, books and other items sold to students, with their receipts.">
       <button class="btn secondary" @click="exportCsv"><AppIcon name="download" />Export CSV</button>
-      <button class="btn primary" @click="selling = true; notice = null"><AppIcon name="cart" />New sale</button>
+      <button v-if="can('sales:write')" class="btn primary" @click="selling = true; notice = null"><AppIcon name="cart" />New sale</button>
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
@@ -97,7 +100,7 @@ const receiptUrl = (id) => `/finances/sales/${id}/receipt`;
               <td class="right">
                 <div class="row-actions">
                   <a :href="receiptUrl(s.id)" target="_blank" class="icon-btn" title="Print receipt"><AppIcon name="printer" size="16" /></a>
-                  <button v-if="!s.voided" class="icon-btn danger" title="Void sale" @click="voidSale(s)"><AppIcon name="ban" size="16" /></button>
+                  <button v-if="!s.voided && can('sales:void')" class="icon-btn danger" title="Void sale" @click="voidSale(s)"><AppIcon name="ban" size="16" /></button>
                 </div>
               </td>
             </tr>

@@ -1,14 +1,18 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import CrudPage from '../components/CrudPage.vue';
+import { useAuth } from '../composables/useAuth';
 import AppIcon from '../components/AppIcon.vue';
 import { classesApi, teachersApi, academicYearsApi } from '../api/http';
 import { money } from '../config/finance';
 
+const { can } = useAuth();
+
 const teachers = ref([]);
 const years = ref([]);
 onMounted(async () => {
-  [teachers.value, years.value] = await Promise.all([teachersApi.list(), academicYearsApi.list()]);
+  // The teacher list is staff data: roles without staff:read just don't get the homeroom dropdown
+  [teachers.value, years.value] = await Promise.all([can('staff:read') ? teachersApi.list() : [], academicYearsApi.list()]);
 });
 
 // computed: re-evaluates when `teachers` changes, so the select options stay in sync
@@ -32,11 +36,12 @@ const fields = computed(() => [
   },
   { key: 'enrolled', label: 'Enrolled', form: false },
 ]);
+
 </script>
 
 <template>
   <CrudPage title="Classes" singular="class" subtitle="Classes per academic year, homeroom teachers and enrollment."
-            :api="classesApi" :fields="fields">
+            :api="classesApi" :readonly="!can('academics:write')" :fields="fields">
     <template #actions="{ row }">
       <RouterLink :to="`/classes/${row.id}`" class="icon-btn" title="Open"><AppIcon name="chevronRight" size="16" /></RouterLink>
     </template>

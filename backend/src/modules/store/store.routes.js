@@ -46,7 +46,7 @@ sales.get('/', async (req, res) => {
   res.json(await paginatedWithSum(req.query, opts, 'SUM(total) FILTER (WHERE NOT voided)'));
 });
 sales.get('/:id', async (req, res) => res.json(await sale(req.params.id)));
-sales.post('/', async (req, res) => res.status(201).json(await createSale(req.body)));
+sales.post('/', async (req, res) => res.status(201).json(await createSale({ ...req.body, received_by: req.user.full_name })));
 sales.post('/:id/void', async (req, res) => res.json(await voidSale(req.params.id, req.body.reason)));
 
 // ---------- Expenses ----------
@@ -65,5 +65,5 @@ expenses.get('/', async (req, res) => {
   res.json(await paginatedWithSum(req.query, opts, 'SUM(amount) FILTER (WHERE NOT voided)'));
 });
 expenses.get('/:id', async (req, res) => res.json(await expense(req.params.id)));
-expenses.post('/', async (req, res) => res.status(201).json(await createExpense(req.body)));
+expenses.post('/', async (req, res) => res.status(201).json(await createExpense({ ...req.body, approved_by: req.body.approved_by || req.user.full_name })));
 expenses.post('/:id/void', async (req, res) => res.json(await voidExpense(req.params.id, req.body.reason)));

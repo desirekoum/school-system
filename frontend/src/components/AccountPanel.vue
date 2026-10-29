@@ -4,6 +4,9 @@ import AppIcon from './AppIcon.vue';
 import StatusBadge from './StatusBadge.vue';
 import { financesApi } from '../api/http';
 import { money, METHODS, methodLabel, PAYMENT_STATUSES, PLAN_STATUSES, label, schedule, today } from '../config/finance';
+import { useAuth } from '../composables/useAuth';
+
+const { can } = useAuth();
 
 /**
  * Tuition account of one registration: balance, payment entry, instalment plan, payment history.
@@ -131,7 +134,7 @@ watch(() => props.registrationId, () => { notice.value = null; planForm.value = 
     <!-- Record a payment -->
     <section v-if="open" class="account-section">
       <h3>Record a payment</h3>
-      <button v-if="!payment" class="btn primary sm" @click="payment = blankPayment()"><AppIcon name="plus" size="14" />New payment</button>
+      <button v-if="!payment && can('payments:write')" class="btn primary sm" @click="payment = blankPayment()"><AppIcon name="plus" size="14" />New payment</button>
       <form v-else class="form-grid" @submit.prevent="pay">
         <label class="field"><span>Amount (FCFA)<b class="req">*</b></span>
           <input v-model.number="payment.amount" type="number" min="1" :max="acc.balance" step="1" required /></label>
@@ -157,7 +160,7 @@ watch(() => props.registrationId, () => { notice.value = null; planForm.value = 
         <h3>Instalment plan</h3>
         <div v-if="acc.plan && !planForm" class="row-actions">
           <StatusBadge :value="acc.plan.status" :label="label(PLAN_STATUSES, acc.plan.status)" />
-          <template v-if="acc.plan.status === 'requested'">
+          <template v-if="acc.plan.status === 'requested' && can('plans:approve')">
             <button class="btn success sm" :disabled="busy" @click="decide(true)"><AppIcon name="check" size="14" />Approve</button>
             <button class="btn secondary sm" :disabled="busy" @click="decide(false)"><AppIcon name="ban" size="14" />Reject</button>
           </template>
@@ -177,14 +180,14 @@ watch(() => props.registrationId, () => { notice.value = null; planForm.value = 
               </tr>
             </tbody>
           </table>
-          <div v-if="open" class="row-actions" style="margin-top: .75rem">
+          <div v-if="open && can('plans:request')" class="row-actions" style="margin-top: .75rem">
             <button class="btn secondary sm" @click="openPlanForm"><AppIcon name="edit" size="14" />{{ acc.plan.status === 'rejected' ? 'New request' : 'Change plan' }}</button>
             <button class="icon-btn danger" title="Remove plan" @click="removePlan"><AppIcon name="trash" size="16" /></button>
           </div>
         </template>
         <template v-else-if="open">
           <p class="muted small">The family pays the full tuition at once, unless an instalment plan is requested and approved.</p>
-          <button class="btn secondary sm" @click="openPlanForm"><AppIcon name="calendar" size="14" />Request an instalment plan</button>
+          <button v-if="can('plans:request')" class="btn secondary sm" @click="openPlanForm"><AppIcon name="calendar" size="14" />Request an instalment plan</button>
         </template>
         <p v-else class="muted small">No instalment plan.</p>
       </template>
@@ -229,7 +232,7 @@ watch(() => props.registrationId, () => { notice.value = null; planForm.value = 
             <td class="right">
               <div class="row-actions">
                 <a :href="receiptUrl(p.id)" target="_blank" class="icon-btn" title="Print receipt"><AppIcon name="printer" size="16" /></a>
-                <button v-if="!p.voided_at" class="icon-btn danger" title="Void payment" @click="voidPayment(p)"><AppIcon name="ban" size="16" /></button>
+                <button v-if="!p.voided_at && can('payments:void')" class="icon-btn danger" title="Void payment" @click="voidPayment(p)"><AppIcon name="ban" size="16" /></button>
               </div>
             </td>
           </tr>

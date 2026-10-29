@@ -10,6 +10,9 @@ import AccountPanel from '../components/AccountPanel.vue';
 import { financesApi, classesApi, academicYearsApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { money, PAYMENT_STATUSES, PLAN_STATUSES, label } from '../config/finance';
+import { useAuth } from '../composables/useAuth';
+
+const { can } = useAuth();
 
 const classes = ref([]);
 const years = ref([]);
@@ -33,7 +36,7 @@ const pct = (a) => (a.fee ? Math.min(100, Math.round((a.paid / a.fee) * 100)) : 
 <template>
   <section>
     <PageHeader title="Tuition & accounts" subtitle="What every registered student owes, has paid and still has to pay.">
-      <RouterLink to="/finances/reports" class="btn secondary"><AppIcon name="chart" />Reports</RouterLink>
+      <RouterLink v-if="can('reports:read')" to="/finances/reports" class="btn secondary"><AppIcon name="chart" />Reports</RouterLink>
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>

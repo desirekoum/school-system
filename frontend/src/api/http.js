@@ -2,10 +2,26 @@ import axios from 'axios';
 
 export const http = axios.create({ baseURL: '/api' });
 
-// Normalize backend errors to a single readable message
+/**
+ * Session handling for every call: 401 (session expired) → sign-in page, keeping the page to come back to;
+ * 403 PASSWORD_CHANGE_REQUIRED → change-password page. Other errors become one readable message.
+ * The router is imported lazily to avoid a circular import (router → views → http).
+ */
 http.interceptors.response.use(
   (res) => res,
-  (err) => Promise.reject(new Error(err.response?.data?.error ?? err.message)),
+  async (err) => {
+    const status = err.response?.status;
+    const url = err.config?.url ?? '';
+    if (!url.startsWith('/auth/')) {
+      const { default: router } = await import('../router');
+      const here = router.currentRoute.value;
+      if (status === 401 && !here.meta.public) router.replace({ path: '/login', query: { next: here.fullPath } });
+      if (err.response?.data?.code === 'PASSWORD_CHANGE_REQUIRED') router.replace('/change-password');
+    }
+    const e = new Error(err.response?.data?.error ?? err.message);
+    e.status = status;
+    return Promise.reject(e);
+  },
 );
 
 /**
@@ -78,3 +94,22 @@ const journal = (name) => ({
 });
 export const salesApi = journal('sales');
 export const expensesApi = journal('expenses');
+
+export const authApi = {
+  login: (data) => http.post('/auth/login', data).then((r) => r.data),
+  verify: (data) => http.post('/auth/verify', data).then((r) => r.data),
+  resend: (challenge) => http.post('/auth/resend', { challenge }).then((r) => r.data),
+  me: () => http.get('/auth/me').then((r) => r.data),
+  logout: () => http.post('/auth/logout'),
+  changePassword: (data) => http.post('/auth/change-password', data).then((r) => r.data),
+};
+
+export const usersApi = {
+  ...resource('users'),
+  roles: () => http.get('/users/roles').then((r) => r.data),
+  events: (params) => http.get('/users/events', { params }).then((r) => r.data),
+  resetPassword: (id) => http.post(`/users/${id}/reset-password`).then((r) => r.data),
+  resetMfa: (id) => http.post(`/users/${id}/reset-mfa`).then((r) => r.data),
+  unlock: (id) => http.post(`/users/${id}/unlock`).then((r) => r.data),
+  signOut: (id) => http.post(`/users/${id}/sign-out`).then((r) => r.data),
+};

@@ -80,6 +80,42 @@ a { color: inherit; text-decoration: none; }
 .nav-link.active svg { color: var(--sidebar-accent); }
 .nav-link.active::before { content: ''; position: absolute; left: -1rem; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--sidebar-accent); }
 .sidebar-foot { margin-top: auto; padding: .75rem; border-radius: var(--radius-sm); background: rgba(255, 255, 255, .07); color: rgba(255, 255, 255, .65); font-size: .78rem; }
+/* The nav scrolls on short screens so the user box stays visible */
+.sidebar nav { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -.5rem .75rem -1rem; padding: 0 .5rem 0 1rem; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.2) transparent; }
+.sidebar-foot { flex: none; }
+.user-box { display: flex; align-items: center; gap: .6rem; margin-top: .7rem; padding-top: .7rem; border-top: 1px solid rgba(255, 255, 255, .1); }
+.user-box .avatar { background: rgba(127, 176, 255, .2); color: #fff; flex: none; }
+.user-meta { min-width: 0; }
+.user-name { color: #fff; font-weight: 600; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-role { color: var(--sidebar-accent); font-size: .75rem; }
+.user-actions { display: flex; gap: .25rem; margin-top: .6rem; }
+.user-actions a, .user-actions button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; padding: .4rem; border: 0; border-radius: 6px; background: rgba(255, 255, 255, .06); color: rgba(255, 255, 255, .8); font: inherit; font-size: .78rem; cursor: pointer; }
+.user-actions a:hover, .user-actions button:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+
+/* ============ Sign-in ============ */
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem 1rem; background: radial-gradient(1200px 600px at 10% -10%, #163a7a 0%, transparent 60%), var(--sidebar-bg); }
+.auth-wrap { width: min(420px, 100%); }
+.auth-card { width: 100%; padding: 2rem; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-lg); }
+.auth-card .brand { justify-content: center; padding: 0 0 1.25rem; }
+.auth-card h1 { font-size: 1.3rem; text-align: center; }
+.auth-card .lead { margin: .35rem 0 1.5rem; text-align: center; color: var(--muted); }
+.auth-card form { display: grid; gap: 1rem; }
+.auth-card .btn { justify-content: center; width: 100%; padding: .7rem; }
+.code-input { font: 600 1.6rem/1 ui-monospace, SFMono-Regular, Menlo, monospace !important; letter-spacing: .5em; text-align: center; padding: .7rem !important; }
+.auth-foot { display: flex; justify-content: space-between; align-items: center; gap: .5rem; font-size: .82rem; }
+.auth-foot button { border: 0; background: none; padding: 0; color: var(--primary); font: inherit; font-weight: 500; cursor: pointer; }
+.auth-foot button:disabled { color: var(--muted); cursor: default; }
+.auth-secure { display: flex; align-items: center; justify-content: center; gap: .4rem; margin-top: 1.25rem; color: rgba(255, 255, 255, .6); font-size: .78rem; }
+.qr-box { display: grid; justify-items: center; gap: .5rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--gray-25); text-align: center; }
+.qr-box img { width: 180px; height: 180px; image-rendering: pixelated; }
+.qr-box code { font-size: .78rem; word-break: break-all; color: var(--gray-700); }
+.secret-box { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .9rem 1rem; border: 1px dashed var(--blue-200); border-radius: var(--radius-sm); background: var(--blue-50); }
+.secret-box code { font-size: 1.15rem; font-weight: 700; letter-spacing: .05em; }
+.perm-matrix th, .perm-matrix td { text-align: center; }
+.perm-matrix th:first-child, .perm-matrix td:first-child { text-align: left; }
+.perm-yes { color: var(--success); }
+.perm-no { color: var(--gray-300); }
+
 
 .main { flex: 1; min-width: 0; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-height: 100vh; }
 .topbar { display: none; }
@@ -139,6 +175,8 @@ a.stat:hover { border-color: var(--blue-200); box-shadow: var(--shadow); transfo
   border: 0; background: transparent; color: var(--gray-500); cursor: pointer; transition: background .15s, color .15s;
 }
 .icon-btn:hover { background: var(--gray-100); color: var(--text); }
+.btn.secondary.danger { color: var(--danger); }
+.btn.secondary.danger:hover { background: var(--danger-bg); border-color: #f7caca; }
 .icon-btn.danger:hover { background: var(--danger-bg); color: var(--danger); }
 .row-actions { display: inline-flex; align-items: center; gap: .15rem; }
 
