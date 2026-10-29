@@ -42,7 +42,7 @@ async function lockRegistration(client, id) {
 export async function syncStatus(client, registrationId) {
   await client.query(`
     UPDATE registrations r
-    SET status = (CASE WHEN rb.balance <= 0 THEN 'confirmed' ELSE 'pending' END)::registration_status
+    SET status = (CASE WHEN rb.confirmable THEN 'confirmed' ELSE 'pending' END)::registration_status
     FROM registration_balances rb
     WHERE rb.registration_id = r.id AND r.id = $1 AND r.status <> 'cancelled'`, [registrationId]);
 }
@@ -145,18 +145,24 @@ export async function requestPlan(client, registrationId, { instalments, reason 
     SELECT $1, u.ord, u.due_date, u.amount
     FROM unnest($2::date[], $3::int[]) WITH ORDINALITY AS u(due_date, amount, ord)`,
     [plan.id, instalments.map((i) => i.due_date), instalments.map((i) => Number(i.amount))]);
+  // A changed plan goes back to "requested": it no longer confirms the registration until approved again
+  await syncStatus(client, registrationId);
   return plan;
 }
 
 export async function decidePlan(planId, status) {
-  const { rows: [plan] } = await query(`
-    UPDATE instalment_plans SET status = $2, decided_at = now()
-    WHERE id = $1 AND status = 'requested' RETURNING *`, [planId, status]);
-  if (!plan) {
-    const { rowCount } = await query('SELECT 1 FROM instalment_plans WHERE id = $1', [planId]);
-    throw new HttpError(rowCount ? 409 : 404, rowCount ? 'Only a requested plan can be approved or rejected' : 'Plan not found');
-  }
-  return plan;
+  return tx(async (client) => {
+    const { rows: [plan] } = await client.query(`
+      UPDATE instalment_plans SET status = $2, decided_at = now()
+      WHERE id = $1 AND status = 'requested' RETURNING *`, [planId, status]);
+    if (!plan) {
+      const { rowCount } = await client.query('SELECT 1 FROM instalment_plans WHERE id = $1', [planId]);
+      throw new HttpError(rowCount ? 409 : 404, rowCount ? 'Only a requested plan can be approved or rejected' : 'Plan not found');
+    }
+    // Approving a plan whose first instalment is already paid confirms the registration
+    await syncStatus(client, plan.registration_id);
+    return plan;
+  });
 }
 
 // ---------- Accounts (one per registration) ----------

@@ -445,7 +445,11 @@ async function populate() {
 
     const paidOf = new Array(regRows.length).fill(0);
     for (const p of payRows) if (!p.voided_at) paidOf[p.reg] += p.amount;
-    regRows.forEach((r, i) => { if (r.status !== 'cancelled' && paidOf[i] >= r.tuition_fee) r.status = 'confirmed'; });
+    // Confirmed once fully paid, or once the first instalment of an approved plan is paid
+    regRows.forEach((r, i) => {
+      const due = planOf[i]?.status === 'approved' ? planOf[i].instalments[0].amount : r.tuition_fee;
+      if (r.status !== 'cancelled' && paidOf[i] >= due) r.status = 'confirmed';
+    });
     const regIds = (await insertMany(client, 'registrations', regRows)).map((r) => r.id);
 
     // Instalment plans and their schedules

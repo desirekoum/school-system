@@ -172,7 +172,7 @@ const remove = (r) => confirm('Delete this registration?') && wrap(() => registr
             </div>
           </template>
         </template>
-        <p class="muted small">The registration is <b>complete</b> (confirmed) once the tuition is fully paid.</p>
+        <p class="muted small">The registration is <b>complete</b> (confirmed) once the tuition is fully paid, or once the first instalment of an approved plan is paid.</p>
       </form>
       <template #footer>
         <button class="btn secondary" @click="form = null">Cancel</button>

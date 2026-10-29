@@ -21,7 +21,7 @@ classes.academic_year, registrations.academic_year ──> academic_years.name
 - Migration `003` backfills academic years from existing classes and registrations.
 - **Finances** (amounts in whole FCFA):
   - Each class has a `tuition_fee`, which is copied onto the registration. A new class fee also applies to registrations with no payment and no plan yet.
-  - A registration stays `pending` until its tuition is fully paid, then becomes `confirmed` automatically.
+  - A registration stays `pending` until its tuition is fully paid, or until the first instalment of an **approved** plan is paid; it then becomes `confirmed` automatically (`registration_balances.confirmable`, migration `007`). Approving, changing or removing a plan, and voiding a payment, re-check the status.
   - An instalment plan (2 to 6 parts, adding up to the fee) is `requested`, then `approved` or `rejected`. Only approved plans count toward overdue amounts.
   - Payments are never deleted: they are voided with a reason. Receipt numbers come from a sequence (`REC-2026-000123`).
   - The views `registration_balances` and `instalment_progress` compute paid, balance and instalment status. A running `SUM() OVER` spreads the payments over the instalments in order.

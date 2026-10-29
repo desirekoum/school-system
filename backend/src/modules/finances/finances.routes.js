@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { query } from '../../db/pool.js';
 import { paginatedList, buildWhere, withDateRange, paginatedWithSum, fullList } from '../../db/paginate.js';
 import {
-  tx, recordPayment, voidPayment, receipt, requestPlan, decidePlan, account, report, ACCOUNTS,
+  tx, syncStatus, recordPayment, voidPayment, receipt, requestPlan, decidePlan, account, report, ACCOUNTS,
 } from './finances.service.js';
 
 const router = Router();
@@ -22,7 +22,11 @@ router.put('/accounts/:id/plan', async (req, res) => {
   res.json(await account(req.params.id));
 });
 router.delete('/accounts/:id/plan', async (req, res) => {
-  await query('DELETE FROM instalment_plans WHERE registration_id = $1', [req.params.id]);
+  // Without the plan, the registration needs the full fee again to stay confirmed
+  await tx(async (client) => {
+    await client.query('DELETE FROM instalment_plans WHERE registration_id = $1', [req.params.id]);
+    await syncStatus(client, req.params.id);
+  });
   res.status(204).end();
 });
 router.post('/plans/:id/approve', async (req, res) => res.json(await decidePlan(req.params.id, 'approved')));
