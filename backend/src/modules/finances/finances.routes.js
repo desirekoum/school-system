@@ -50,7 +50,7 @@ router.get('/payments', async (req, res) => {
 });
 router.get('/payments/:id', async (req, res) => res.json(await receipt(req.params.id)));
 router.post('/payments', async (req, res) => {
-  const payment = await tx((client) => recordPayment(client, req.body));
+  const payment = await tx((client) => recordPayment(client, { ...req.body, received_by: req.user.full_name }));
   res.status(201).json(await receipt(payment.id));
 });
 router.post('/payments/:id/void', async (req, res) => res.json(await voidPayment(req.params.id, req.body.reason)));

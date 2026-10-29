@@ -1,5 +1,6 @@
 <script setup>
 import CrudPage from '../components/CrudPage.vue';
+import { useAuth } from '../composables/useAuth';
 import AppIcon from '../components/AppIcon.vue';
 import { studentsApi } from '../api/http';
 import { GENDERS, BLOOD_GROUPS, STUDENT_STATUSES } from '../config/options';
@@ -34,11 +35,13 @@ const fields = [
 ];
 
 const identity = (s) => ({ name: `${s.first_name} ${s.last_name}`, sub: s.email, photo: s.photo_url });
+
+const { can } = useAuth();
 </script>
 
 <template>
   <CrudPage title="Students" singular="student" subtitle="Student records, contacts and health information."
-            :api="studentsApi" :fields="fields" :identity="identity" :row-link="(s) => `/students/${s.id}`">
+            :api="studentsApi" :readonly="!can('students:write')" :fields="fields" :identity="identity" :row-link="(s) => `/students/${s.id}`">
     <template #actions="{ row }">
       <RouterLink :to="`/students/${row.id}`" class="icon-btn" title="Open"><AppIcon name="chevronRight" size="16" /></RouterLink>
     </template>

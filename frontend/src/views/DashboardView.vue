@@ -4,6 +4,9 @@ import PageHeader from '../components/PageHeader.vue';
 import AppIcon from '../components/AppIcon.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { studentsApi, teachersApi, classesApi, coursesApi, registrationsApi } from '../api/http';
+import { useAuth } from '../composables/useAuth';
+
+const { user } = useAuth();
 
 const totals = ref({});
 const recent = ref([]);
@@ -11,21 +14,23 @@ const counts = ref({});
 const classes = ref([]);
 const loaded = ref(false);
 
-// pageSize=1 gives the total count without downloading the whole table
-const countOf = (api, filters = {}) => api.list({ page: 1, pageSize: 1, ...filters }).then((r) => r.total);
+// pageSize=1 gives the total count without downloading the whole table.
+// A list the role may not read (403) gives null: its tile is hidden instead of breaking the page.
+const allowed = (p) => p.catch((e) => (e.status === 403 ? null : Promise.reject(e)));
+const countOf = (api, filters = {}) => allowed(api.list({ page: 1, pageSize: 1, ...filters }).then((r) => r.total));
 
 onMounted(async () => {
   const [students, teachers, courses, regs, cls] = await Promise.all([
     countOf(studentsApi, { status: 'active' }),
     countOf(teachersApi, { status: 'active' }),
     countOf(coursesApi),
-    registrationsApi.list({ page: 1, pageSize: 6 }),
-    classesApi.list(),
+    allowed(registrationsApi.list({ page: 1, pageSize: 6 })),
+    allowed(classesApi.list()),
   ]);
   totals.value = { students, teachers, courses };
-  recent.value = regs.data;
-  counts.value = regs.counts;
-  classes.value = cls;
+  recent.value = regs?.data ?? null;
+  counts.value = regs?.counts ?? {};
+  classes.value = cls ?? [];
   loaded.value = true;
 });
 
@@ -34,7 +39,7 @@ const stats = computed(() => [
   { label: 'Active teachers', value: totals.value.teachers, icon: 'teachers', to: '/teachers' },
   { label: 'Classes', value: classes.value.length, icon: 'classes', to: '/classes' },
   { label: 'Courses', value: totals.value.courses, icon: 'courses', to: '/courses' },
-]);
+].filter((s) => !loaded.value || s.value !== null));
 
 const pending = computed(() => counts.value.pending ?? 0);
 
@@ -45,7 +50,7 @@ const occupancy = computed(() =>
 
 <template>
   <section>
-    <PageHeader title="Dashboard" subtitle="Overview of your school at a glance." />
+    <PageHeader title="Dashboard" :subtitle="user ? `Welcome, ${user.full_name} (${user.role_label}).` : 'Overview of your school at a glance.'" />
 
     <div class="stats">
       <RouterLink v-for="s in stats" :key="s.label" :to="s.to" class="card stat">
@@ -58,7 +63,7 @@ const occupancy = computed(() =>
     </div>
 
     <div class="grid-2">
-      <div class="card">
+      <div v-if="recent !== null" class="card">
         <div class="card-header">
           <h2>Recent registrations</h2>
           <RouterLink to="/registrations" class="link">View all</RouterLink>
@@ -71,7 +76,7 @@ const occupancy = computed(() =>
             </div>
             <StatusBadge :value="r.status" />
           </li>
-          <li v-if="loaded && !recent.length" class="muted">No registrations yet.</li>
+          <li v-if="loaded && !recent?.length" class="muted">No registrations yet.</li>
         </ul>
         <RouterLink v-if="pending" to="/registrations" class="card-foot">
           <AppIcon name="alert" size="16" /> {{ pending }} registration{{ pending > 1 ? 's' : '' }} waiting for confirmation

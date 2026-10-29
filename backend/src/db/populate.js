@@ -7,12 +7,14 @@
  *
  * Also creates the academic year (3 trimesters × 2 exams), a full year of grades, and the finances:
  * tuition fee per class, payments (cash, mobile money, transfers, cheques), instalment plans,
- * the school shop (items, stock, sales to students) and the year's expenses.
+ * the school shop (items, stock, sales to students) and the year's expenses,
+ * and one demo account per role (see DEMO_PASSWORD below: change it before any real use).
  * Uses a seeded random generator, so every run produces the same data set
  * (payments dated after today are simply not recorded yet).
  */
 import { pool } from './pool.js';
 import { splitInTrimesters } from '../modules/academic-years/academic-years.service.js';
+import { hashPassword } from '../modules/auth/crypto.js';
 
 const RESET = process.argv.includes('--reset');
 
@@ -204,7 +206,7 @@ async function populate() {
     await client.query('BEGIN');
     if (RESET) {
       // RESTART IDENTITY resets SERIAL counters; CASCADE empties dependent tables too
-      await client.query(`TRUNCATE sale_items, sales, expenses, items, payments, instalments, instalment_plans, grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
+      await client.query(`TRUNCATE auth_events, sessions, auth_challenges, users, sale_items, sales, expenses, items, payments, instalments, instalment_plans, grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
                           classes, academic_years, courses, students, teachers RESTART IDENTITY CASCADE`);
     }
 
@@ -609,8 +611,25 @@ async function populate() {
     await client.query(`UPDATE items i SET stock = u.stock FROM unnest($1::int[], $2::int[]) AS u(id, stock) WHERE i.id = u.id`,
       [itemIds, stock.map((x) => x ?? null)]);
 
+    // --- Demo accounts: one per role. Codes are printed in the API console until SMTP/SMS are configured ---
+    const DEMO_PASSWORD = 'SchoolDoc2026';
+    const hash = await hashPassword(DEMO_PASSWORD);
+    const teacher = teachers.find((t) => ccRows.some((cc) => cc.teacher_id === t.id));
+    const { rows: [tRow] } = await client.query('SELECT first_name, last_name, email FROM teachers WHERE id = $1', [teacher.id]);
+    const userRows = [
+      { username: 'admin', full_name: 'Administrateur Système', role: 'admin', email: 'admin@schooldoc.cm', mfa_method: 'email' },
+      { username: 'principal', full_name: 'Dr Jeanne Mballa', role: 'principal', email: 'principal@schooldoc.cm', mfa_method: 'email' },
+      { username: 'registrar', full_name: 'Paul Nkodo', role: 'registrar', email: 'scolarite@schooldoc.cm', mfa_method: 'email' },
+      { username: 'bursar', full_name: 'Aïcha Bello', role: 'bursar', email: 'econome@schooldoc.cm', phone: '+237699000004', mfa_method: 'sms' },
+      { username: 'cashier', full_name: 'Éric Fouda', role: 'cashier', phone: '+237677000005', mfa_method: 'sms' },
+      { username: 'teacher', full_name: `${tRow.first_name} ${tRow.last_name}`, role: 'teacher', email: tRow.email, teacher_id: teacher.id, mfa_method: 'totp' },
+    ].map((u) => ({ email: null, phone: null, teacher_id: null, ...u, password_hash: hash, must_change_password: false }));
+    await insertMany(client, 'users', userRows, null);
+
     await client.query('COMMIT');
-    console.log(`Done: ${teacherRows.length} teachers, ${courseRows.length} courses, ${classes.length} classes, ` +
+    console.log(`\nDemo accounts (password "${DEMO_PASSWORD}", second factor shown in the API console in development):`);
+    for (const u of userRows) console.log(`  ${u.username.padEnd(10)} ${u.role.padEnd(10)} ${u.mfa_method}`);
+    console.log(`\nDone: ${teacherRows.length} teachers, ${courseRows.length} courses, ${classes.length} classes, ` +
       `${studentRows.length + formerRows.length} students, ${guardianRows.length} guardians, ${regRows.length} registrations, ${gradeRows.length} grades, ` +
       `${planIds.length} instalment plans, ${payRows.length} payments, ${itemRows.length} items, ${saleRows.length} sales, ${expRows.length} expenses.`);
   } catch (e) {

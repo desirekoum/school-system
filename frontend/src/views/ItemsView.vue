@@ -1,5 +1,6 @@
 <script setup>
 import CrudPage from '../components/CrudPage.vue';
+import { useAuth } from '../composables/useAuth';
 import { itemsApi } from '../api/http';
 import { money, ITEM_CATEGORIES } from '../config/finance';
 
@@ -17,9 +18,11 @@ const fields = [
   },
   { key: 'description', label: 'Description', type: 'textarea', list: false },
 ];
+
+const { can } = useAuth();
 </script>
 
 <template>
   <CrudPage title="Items for sale" singular="item" subtitle="Uniforms, books, supplies and services the school sells to students. Stock goes up with purchases and down with sales."
-            :api="itemsApi" :fields="fields" />
+            :api="itemsApi" :readonly="!can('items:write')" :fields="fields" />
 </template>

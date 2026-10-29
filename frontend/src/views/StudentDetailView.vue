@@ -9,8 +9,10 @@ import Avatar from '../components/Avatar.vue';
 import AppIcon from '../components/AppIcon.vue';
 import ReportCard from '../components/ReportCard.vue';
 import StudentTuition from '../components/StudentTuition.vue';
+import { useAuth } from '../composables/useAuth';
 
 const props = defineProps({ id: String });
+const { can } = useAuth();
 
 const student = ref(null);
 const guardians = ref([]);
@@ -93,14 +95,14 @@ async function removeGuardian(g) {
       </div>
     </div>
 
-    <StudentTuition :student-id="id" />
+    <StudentTuition v-if="can('finance:read')" :student-id="id" />
 
-    <ReportCard :student-id="id" />
+    <ReportCard v-if="can('grades:read')" :student-id="id" />
 
     <div class="card">
       <div class="card-header">
         <h2>Guardians</h2>
-        <button class="btn secondary sm" @click="form = emptyForm()"><AppIcon name="plus" size="14" />Add guardian</button>
+        <button v-if="can('students:write')" class="btn secondary sm" @click="form = emptyForm()"><AppIcon name="plus" size="14" />Add guardian</button>
       </div>
       <div class="table-wrap">
         <table class="table">
@@ -115,7 +117,7 @@ async function removeGuardian(g) {
                 </div>
               </td>
               <td>{{ label(RELATIONS, g.relation) }}</td><td>{{ g.phone ?? '—' }}</td><td>{{ g.email ?? '—' }}</td><td>{{ g.profession ?? '—' }}</td>
-              <td class="right"><button class="icon-btn danger" title="Unlink" @click="removeGuardian(g)"><AppIcon name="trash" size="16" /></button></td>
+              <td class="right"><button v-if="can('students:write')" class="icon-btn danger" title="Unlink" @click="removeGuardian(g)"><AppIcon name="trash" size="16" /></button></td>
             </tr>
           </tbody>
         </table>

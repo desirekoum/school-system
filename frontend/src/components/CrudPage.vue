@@ -24,6 +24,7 @@ const props = defineProps({
   fields: Array,
   identity: Function,
   rowLink: Function,
+  readonly: Boolean,   // the role can only read: no New / Edit / Delete
 });
 
 const filterFields = computed(() => props.fields.filter((f) => f.filter && f.options));
@@ -89,7 +90,7 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
 <template>
   <section>
     <PageHeader :title="title" :subtitle="subtitle">
-      <button class="btn primary" @click="openNew"><AppIcon name="plus" />New {{ singular }}</button>
+      <button v-if="!readonly" class="btn primary" @click="openNew"><AppIcon name="plus" />New {{ singular }}</button>
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
@@ -135,8 +136,8 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
               <td class="right">
                 <div class="row-actions">
                   <slot name="actions" :row="row" />
-                  <button class="icon-btn" title="Edit" @click="openEdit(row)"><AppIcon name="edit" size="16" /></button>
-                  <button class="icon-btn danger" title="Delete" @click="confirmRemove(row)"><AppIcon name="trash" size="16" /></button>
+                  <button v-if="!readonly" class="icon-btn" title="Edit" @click="openEdit(row)"><AppIcon name="edit" size="16" /></button>
+                  <button v-if="!readonly" class="icon-btn danger" title="Delete" @click="confirmRemove(row)"><AppIcon name="trash" size="16" /></button>
                 </div>
               </td>
             </tr>
@@ -146,7 +147,7 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
         <div v-else-if="!items.length" class="empty">
           <AppIcon name="inbox" size="32" />
           <p>{{ isFiltered ? 'No match for your search.' : `No ${title.toLowerCase()} yet.` }}</p>
-          <button v-if="!isFiltered" class="btn secondary" @click="openNew"><AppIcon name="plus" />Add the first one</button>
+          <button v-if="!isFiltered && !readonly" class="btn secondary" @click="openNew"><AppIcon name="plus" />Add the first one</button>
         </div>
       </div>
       <PaginationBar v-if="total" v-model:page="page" v-model:page-size="pageSize" :total="total" :total-pages="totalPages" />

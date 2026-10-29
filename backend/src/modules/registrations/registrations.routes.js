@@ -3,6 +3,7 @@ import { query } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
 import { register, setStatus } from './registrations.service.js';
 import { paginatedList, buildWhere } from '../../db/paginate.js';
+import { can } from '../auth/roles.js';
 
 const router = Router();
 const STATUSES = ['pending', 'confirmed', 'cancelled'];
@@ -37,6 +38,10 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+  // A first payment taken at registration also needs the payment permission
+  if (req.body.payment?.amount && !can(req.user, 'payments:write')) throw new HttpError(403, 'Your role cannot record payments');
+  if (req.body.plan && !can(req.user, 'plans:request')) throw new HttpError(403, 'Your role cannot request instalment plans');
+  if (req.body.payment?.amount) req.body.payment.received_by = req.user.full_name;
   res.status(201).json(await register(req.body));
 });
 

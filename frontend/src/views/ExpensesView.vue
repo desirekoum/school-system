@@ -9,6 +9,9 @@ import { expensesApi, itemsApi, academicYearsApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { money, METHODS, methodLabel, EXPENSE_CATEGORIES, shortCategory, today } from '../config/finance';
 import { downloadCsv } from '../utils/csv';
+import { useAuth } from '../composables/useAuth';
+
+const { can } = useAuth();
 
 const years = ref([]);
 const items = ref([]);
@@ -76,7 +79,7 @@ async function exportCsv() {
   <section>
     <PageHeader title="Expenses" subtitle="What the school spends: purchases for the year, stock for the shop, running costs.">
       <button class="btn secondary" @click="exportCsv"><AppIcon name="download" />Export CSV</button>
-      <button class="btn primary" @click="openForm"><AppIcon name="plus" />New expense</button>
+      <button v-if="can('expenses:write')" class="btn primary" @click="openForm"><AppIcon name="plus" />New expense</button>
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
@@ -111,7 +114,7 @@ async function exportCsv() {
               <td><span class="pill">{{ shortCategory(e.category) }}</span></td>
               <td class="num"><b>{{ money(e.amount) }}</b><div v-if="e.quantity > 1" class="muted small">{{ e.quantity }} × {{ money(e.unit_price) }}</div></td>
               <td>{{ methodLabel(e.method) }}<div v-if="e.reference" class="muted small">{{ e.reference }}</div></td>
-              <td class="right"><button v-if="!e.voided" class="icon-btn danger" title="Void expense" @click="voidExpense(e)"><AppIcon name="ban" size="16" /></button></td>
+              <td class="right"><button v-if="!e.voided && can('expenses:void')" class="icon-btn danger" title="Void expense" @click="voidExpense(e)"><AppIcon name="ban" size="16" /></button></td>
             </tr>
           </tbody>
         </table>

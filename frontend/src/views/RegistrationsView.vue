@@ -10,6 +10,9 @@ import { usePaginatedList } from '../composables/usePaginatedList';
 import PaginationBar from '../components/PaginationBar.vue';
 import AccountPanel from '../components/AccountPanel.vue';
 import { money, METHODS, schedule, today } from '../config/finance';
+import { useAuth } from '../composables/useAuth';
+
+const { can } = useAuth();
 
 const students = ref([]);
 const classes = ref([]);
@@ -33,7 +36,7 @@ const refreshClasses = async () => (classes.value = await classesApi.list()); //
 // Dropdown data is only needed when the form opens (active students only)
 async function openForm() {
   formError.value = '';
-  form.value = { student_id: '', class_id: '', pay: true, amount: '', method: 'cash', reference: '', withPlan: false, instalments: 3 };
+  form.value = { student_id: '', class_id: '', pay: can('payments:write'), amount: '', method: 'cash', reference: '', withPlan: false, instalments: 3 };
   [students.value] = await Promise.all([studentsApi.list({ status: 'active' }), refreshClasses()]);
 }
 
@@ -81,7 +84,7 @@ const remove = (r) => confirm('Delete this registration?') && wrap(() => registr
 <template>
   <section>
     <PageHeader title="Registrations" subtitle="Enroll students in classes. A registration is complete once the tuition is paid.">
-      <button class="btn primary" @click="openForm"><AppIcon name="plus" />New registration</button>
+      <button v-if="can('registrations:write')" class="btn primary" @click="openForm"><AppIcon name="plus" />New registration</button>
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
@@ -116,10 +119,10 @@ const remove = (r) => confirm('Delete this registration?') && wrap(() => registr
               <td><StatusBadge :value="r.status" :label="r.status === 'pending' ? 'Awaiting payment' : undefined" /></td>
               <td class="right">
                 <div class="row-actions">
-                  <button class="btn sm" :class="r.balance > 0 && r.status !== 'cancelled' ? 'primary' : 'secondary'" @click="account = r.id"><AppIcon name="wallet" size="14" />{{ r.balance > 0 && r.status !== 'cancelled' ? 'Pay' : 'Account' }}</button>
-                  <button v-if="r.status === 'cancelled'" class="icon-btn" title="Restore registration" @click="setStatus(r, r.balance > 0 ? 'pending' : 'confirmed')"><AppIcon name="check" size="16" /></button>
-                  <button v-if="r.status !== 'cancelled'" class="icon-btn" title="Cancel registration" @click="setStatus(r, 'cancelled')"><AppIcon name="ban" size="16" /></button>
-                  <button class="icon-btn danger" title="Delete" @click="remove(r)"><AppIcon name="trash" size="16" /></button>
+                  <button v-if="can('finance:read')" class="btn sm" :class="r.balance > 0 && r.status !== 'cancelled' ? 'primary' : 'secondary'" @click="account = r.id"><AppIcon name="wallet" size="14" />{{ r.balance > 0 && r.status !== 'cancelled' ? 'Pay' : 'Account' }}</button>
+                  <button v-if="r.status === 'cancelled' && can('registrations:write')" class="icon-btn" title="Restore registration" @click="setStatus(r, r.balance > 0 ? 'pending' : 'confirmed')"><AppIcon name="check" size="16" /></button>
+                  <button v-if="r.status !== 'cancelled' && can('registrations:write')" class="icon-btn" title="Cancel registration" @click="setStatus(r, 'cancelled')"><AppIcon name="ban" size="16" /></button>
+                  <button v-if="can('registrations:write')" class="icon-btn danger" title="Delete" @click="remove(r)"><AppIcon name="trash" size="16" /></button>
                 </div>
               </td>
             </tr>
@@ -152,7 +155,7 @@ const remove = (r) => confirm('Delete this registration?') && wrap(() => registr
         <template v-if="chosenClass">
           <p class="fee-line">Tuition fee <b>{{ money(chosenClass.tuition_fee) }}</b></p>
           <template v-if="chosenClass.tuition_fee > 0">
-            <label class="check"><input v-model="form.withPlan" type="checkbox" /> The family requests an instalment plan</label>
+            <label v-if="can('plans:request')" class="check"><input v-model="form.withPlan" type="checkbox" /> The family requests an instalment plan</label>
             <label v-if="form.withPlan" class="field"><span>Number of instalments</span>
               <select v-model.number="form.instalments"><option v-for="n in [2, 3, 4, 5, 6]" :key="n" :value="n">{{ n }}</option></select>
             </label>
@@ -160,7 +163,7 @@ const remove = (r) => confirm('Delete this registration?') && wrap(() => registr
               <li v-for="(i, n) in plan" :key="n">#{{ n + 1 }} · {{ new Date(i.due_date).toLocaleDateString() }} · <b>{{ money(i.amount) }}</b></li>
               <li>Dates can be adjusted from the tuition account. The plan must be approved.</li>
             </ul>
-            <label class="check"><input v-model="form.pay" type="checkbox" /> Record a payment now</label>
+            <label v-if="can('payments:write')" class="check"><input v-model="form.pay" type="checkbox" /> Record a payment now</label>
             <div v-if="form.pay" class="form-grid">
               <label class="field"><span>Amount (FCFA)</span><input v-model.number="form.amount" type="number" min="1" :max="chosenClass.tuition_fee" step="1" /></label>
               <label class="field"><span>Method</span>

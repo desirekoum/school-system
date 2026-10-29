@@ -58,9 +58,17 @@ frontend/src
 
 ```bash
 createdb schooldoc
-cd backend && cp .env.example .env && npm i && npm run migrate && npm run dev   # :3000
-cd frontend && npm i && npm run dev                                            # :5173 (proxies /api)
+cd backend && cp .env.example .env     # then set APP_SECRET (openssl rand -base64 48)
+npm i && npm run dev-cert              # self-signed certificate for https://localhost (certs/, git-ignored)
+npm run migrate
+npm run create-admin -- admin you@school.cm "Your Name"   # first account: prints a temporary password
+npm run dev                                               # https://localhost:3000
+cd ../frontend && npm i && npm run dev                    # https://localhost:5173 (proxies /api over HTTPS)
 ```
+
+Open https://localhost:5173 and sign in. In development, email and SMS codes are printed in the API console
+until `SMTP_*` / `SMS_*` are set in `.env`. Users, roles and the security design are described in
+[docs/ROLES.md](docs/ROLES.md).
 
 ### Sample data
 
@@ -82,10 +90,20 @@ guardians (siblings share parents), and registrations. It also creates the acade
 and phone numbers come from Cameroon, Gabon, Congo, CAR, Chad and Equatorial Guinea. The generator
 is seeded, so every run gives the same data.
 
+It also creates one demo account per role (password `SchoolDoc2026`, already changed, so no forced change):
+`admin`, `principal`, `registrar` (email code), `bursar`, `cashier` (SMS code) and `teacher` (authenticator app:
+the first sign-in shows a QR code). `--reset` deletes all users too: run `create-admin` again afterwards if needed.
+Never keep these accounts on a real server.
+
 ## API
+
+Every endpoint except `/api/health` and `/api/auth/*` needs a session cookie and the role permission listed in
+[docs/ROLES.md](docs/ROLES.md): `401` = not signed in, `403` = signed in but not allowed.
 
 | Resource | Endpoints |
 |---|---|
+| `/api/auth` | `POST /login {username, password}` → `{challenge, method, destination, setup?}`, `POST /verify {challenge, code}` → user + `sd_session` cookie, `POST /resend {challenge}`, `GET /me`, `POST /change-password {current_password, new_password}`, `POST /logout` |
+| `/api/users` (admin) | `GET /` (filters `role`, `is_active`), `GET /:id` (+ recent events, open sessions), `POST /` → `{user, temporary_password}`, `PUT /:id`, `DELETE /:id`, `POST /:id/reset-password`, `/reset-mfa`, `/unlock`, `/sign-out`, `GET /roles`, `GET /events` (security log) |
 | `/api/students`, `/api/teachers`, `/api/courses`, `/api/classes` | `GET /`, `GET /:id`, `POST /`, `PUT /:id`, `DELETE /:id` |
 | `/api/classes/:id/courses` | `GET`, `POST {course_id, teacher_id}`, `DELETE /:courseId` |
 | `/api/classes/:id/students` | `GET` |
