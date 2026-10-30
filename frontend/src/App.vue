@@ -1,10 +1,11 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import AppIcon from './components/AppIcon.vue';
-import Avatar from './components/Avatar.vue';
+import UserMenu from './components/UserMenu.vue';
 import logo from './assets/logo.png';
 import { useAuth } from './composables/useAuth';
+import { academicYearsApi } from './api/http';
 
 const nav = [
   { group: 'Overview', items: [{ to: '/', label: 'Dashboard', icon: 'dashboard', exact: true }] },
@@ -30,21 +31,20 @@ const nav = [
 ];
 
 // Only the pages the role can open; a group with no page left is hidden
-const { user, can, logout } = useAuth();
+const { user, can } = useAuth();
 const visibleNav = computed(() => nav
   .map((g) => ({ ...g, items: g.items.filter((i) => !i.perm || can(i.perm)) }))
   .filter((g) => g.items.length));
 
-const router = useRouter();
-async function signOut() {
-  await logout();
-  router.replace('/login');
-}
-
-// School year starts in September (month index 8)
+// Academic year shown in the top bar: the one marked current in the database,
+// else guessed from the date (the school year starts in September, month index 8)
 const now = new Date();
 const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-const academicYear = `${startYear}–${startYear + 1}`;
+const academicYear = ref(`${startYear}-${startYear + 1}`);
+watch(user, async (u) => {
+  if (!u) return;
+  try { academicYear.value = (await academicYearsApi.current())?.name ?? academicYear.value; } catch { /* keep the guess */ }
+}, { immediate: true });
 
 // Mobile: sidebar is an off-canvas drawer, closed on every navigation
 const open = ref(false);
@@ -73,27 +73,22 @@ const bare = computed(() => route.meta.public || route.meta.bare);
           </RouterLink>
         </div>
       </nav>
-      <div class="sidebar-foot">
-        <p>Academic year {{ academicYear }}</p>
-        <div v-if="user" class="user-box">
-          <Avatar :name="user.full_name" :size="32" />
-          <div class="user-meta">
-            <p class="user-name">{{ user.full_name }}</p>
-            <p class="user-role">{{ user.role_label }}</p>
-          </div>
-        </div>
-        <div v-if="user" class="user-actions">
-          <RouterLink to="/change-password" title="Change password"><AppIcon name="key" size="16" />Password</RouterLink>
-          <button type="button" @click="signOut"><AppIcon name="logout" size="16" />Sign out</button>
-        </div>
-      </div>
     </aside>
     <div class="backdrop" @click="open = false" />
 
     <div class="main">
+      <!-- Top bar: menu button and logo on mobile; academic year and the user menu on the right -->
       <header class="topbar">
         <button class="icon-btn menu-btn" aria-label="Open menu" @click="open = true"><AppIcon name="menu" /></button>
         <RouterLink to="/" class="brand mobile-brand"><img :src="logo" alt="" /><span>School<b>Doc</b></span></RouterLink>
+        <div class="topbar-right">
+          <component :is="can('academics:read') ? 'RouterLink' : 'span'" to="/academic-years" class="year-chip" title="Academic year">
+            <AppIcon name="calendar" size="16" />
+            <span class="year-label">Academic year</span>
+            <b>{{ academicYear.replace('-', '–') }}</b>
+          </component>
+          <UserMenu />
+        </div>
       </header>
       <main class="content">
         <RouterView v-slot="{ Component }">
