@@ -7,6 +7,9 @@ import SlideOver from './SlideOver.vue';
 import StatusBadge from './StatusBadge.vue';
 import Avatar from './Avatar.vue';
 import AppIcon from './AppIcon.vue';
+import ExportMenu from './ExportMenu.vue';
+import ImportDialog from './ImportDialog.vue';
+import { exportRows } from '../utils/xlsx';
 
 /**
  * Generic list + form page driven by a `fields` config:
@@ -25,6 +28,8 @@ const props = defineProps({
   identity: Function,
   rowLink: Function,
   readonly: Boolean,   // the role can only read: no New / Edit / Delete
+  imports: Array,      // Excel imports offered on this page: [{ entity, label }] (see backend modules/import)
+  exportName: String,  // file name of exports, without extension
 });
 
 const filterFields = computed(() => props.fields.filter((f) => f.filter && f.options));
@@ -82,6 +87,24 @@ async function confirmRemove(row) {
   }
 }
 
+// Export of the whole filtered list (not just the current page). Option fields are written as their label
+// and numbers stay raw (no "FCFA" formatting), so the file can be edited and imported back.
+const exporting = ref(false);
+const importing = ref(false);
+async function exportList(format) {
+  exporting.value = true;
+  try {
+    const rows = await props.api.list({ search: search.value || undefined, ...filters });
+    const columns = props.fields.map((f) => [f.key, f.label,
+      f.options ? (v) => f.options.find((o) => o.value == v)?.label ?? v : f.type === 'number' ? (v) => (v == null || v === '' ? null : Number(v)) : null]);
+    await exportRows(format, props.exportName ?? props.title.toLowerCase().replace(/\W+/g, '-'), rows, columns);
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    exporting.value = false;
+  }
+}
+
 const isFiltered = computed(() => !!search.value || Object.values(filters).some(Boolean));
 
 const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o) => o.value == row[f.key])?.label ?? row[f.key]);
@@ -90,6 +113,8 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
 <template>
   <section>
     <PageHeader :title="title" :subtitle="subtitle">
+      <ExportMenu :busy="exporting" @export="exportList" />
+      <button v-if="!readonly && imports?.length" class="btn secondary" @click="importing = true"><AppIcon name="upload" />Import</button>
       <button v-if="!readonly" class="btn primary" @click="openNew"><AppIcon name="plus" />New {{ singular }}</button>
     </PageHeader>
 
@@ -152,6 +177,8 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
       </div>
       <PaginationBar v-if="total" v-model:page="page" v-model:page-size="pageSize" :total="total" :total-pages="totalPages" />
     </div>
+
+    <ImportDialog v-if="importing" :imports="imports" @close="importing = false" @done="load" />
 
     <SlideOver v-if="form" :title="form.id ? `Edit ${singular}` : `New ${singular}`" @close="form = null">
       <div v-if="formError" class="alert"><AppIcon name="alert" />{{ formError }}</div>

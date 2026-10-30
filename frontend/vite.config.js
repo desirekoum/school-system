@@ -13,6 +13,10 @@ const api = process.env.API_URL ?? (tls ? 'https://localhost:3000' : 'http://loc
 
 export default defineConfig({
   plugins: [vue()],
+  // exceljs (~930 kB) is its own lazy chunk, loaded on the first Excel export only
+  build: { chunkSizeWarningLimit: 1000 },
+  // Pre-bundled at dev start, so the first export doesn't make Vite re-optimize and reload the page
+  optimizeDeps: { include: ['exceljs'] },
   server: {
     https: tls ?? undefined,
     // Dev proxy: /api calls go to Express on the same origin, so the session cookie is first-party

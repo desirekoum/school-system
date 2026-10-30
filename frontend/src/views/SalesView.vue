@@ -9,7 +9,8 @@ import SaleForm from '../components/SaleForm.vue';
 import { salesApi, academicYearsApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { money, METHODS, methodLabel } from '../config/finance';
-import { downloadCsv } from '../utils/csv';
+import { exportRows } from '../utils/xlsx';
+import ExportMenu from '../components/ExportMenu.vue';
 import { useAuth } from '../composables/useAuth';
 
 const { can } = useAuth();
@@ -41,9 +42,9 @@ const voidSale = async (s) => {
   }
 };
 
-async function exportCsv() {
+async function exportList(format) {
   const rows = await salesApi.list({ ...filters, search: search.value || undefined });
-  downloadCsv(`sales-${filters.from || 'all'}-${filters.to || 'all'}.csv`, rows, [
+  await exportRows(format, `sales-${filters.from || 'all'}-${filters.to || 'all'}`, rows, [
     ['receipt_number', 'Receipt'], ['sold_at', 'Date'], ['buyer', 'Buyer'], ['matricule', 'Matricule'], ['summary', 'Items'],
     ['total', 'Total (FCFA)'], ['method', 'Method', methodLabel], ['reference', 'Reference'], ['received_by', 'Received by'], ['voided', 'Voided']]);
 }
@@ -53,7 +54,7 @@ const receiptUrl = (id) => `/finances/sales/${id}/receipt`;
 <template>
   <section>
     <PageHeader title="Sales" subtitle="Uniforms, books and other items sold to students, with their receipts.">
-      <button class="btn secondary" @click="exportCsv"><AppIcon name="download" />Export CSV</button>
+      <ExportMenu @export="exportList" />
       <button v-if="can('sales:write')" class="btn primary" @click="selling = true; notice = null"><AppIcon name="cart" />New sale</button>
     </PageHeader>
 

@@ -10,6 +10,13 @@ import { can } from '../modules/auth/roles.js';
 const ACCESS = [
   ['*', /^\/users(\/|$)/, 'users:manage'],
 
+  // Excel imports (template + upload) need the right to write what is imported
+  ['*', /^\/import\/(students|guardians)(\/|$)/, 'students:write'],
+  ['*', /^\/import\/teachers(\/|$)/, 'staff:write'],
+  ['*', /^\/import\/(courses|classes|class-courses)(\/|$)/, 'academics:write'],
+  ['*', /^\/import\/items(\/|$)/, 'items:write'],
+  ['*', /^\/import\/registrations(\/|$)/, 'registrations:write'],
+
   ['GET', /^\/students\/\d+\/report-card$/, 'grades:read'],
   ['GET', /^\/(students|guardians)(\/|$)/, 'students:read'],
   ['WRITE', /^\/(students|guardians)(\/|$)/, 'students:write'],

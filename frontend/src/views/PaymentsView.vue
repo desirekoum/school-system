@@ -7,7 +7,8 @@ import PaginationBar from '../components/PaginationBar.vue';
 import { financesApi, academicYearsApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { money, METHODS, methodLabel } from '../config/finance';
-import { downloadCsv } from '../utils/csv';
+import { exportRows } from '../utils/xlsx';
+import ExportMenu from '../components/ExportMenu.vue';
 
 const years = ref([]);
 const { items, total, totalPages, page, pageSize, search, filters, loading, error, meta } = usePaginatedList(
@@ -27,11 +28,11 @@ function range(kind) {
 
 // CSV export of the whole filtered journal (not just the current page)
 const exporting = ref(false);
-async function exportCsv() {
+async function exportList(format) {
   exporting.value = true;
   try {
     const rows = await financesApi.payments({ ...filters, search: search.value || undefined });
-    downloadCsv(`payments-${filters.from || 'all'}-${filters.to || 'all'}.csv`, rows, [
+    await exportRows(format, `payments-${filters.from || 'all'}-${filters.to || 'all'}`, rows, [
       ['receipt_number', 'Receipt'], ['paid_at', 'Date'], ['student', 'Student'], ['matricule', 'Matricule'], ['class_name', 'Class'],
       ['academic_year', 'Year'], ['method', 'Method', methodLabel], ['reference', 'Reference'], ['amount', 'Amount (FCFA)'],
       ['received_by', 'Received by'], ['voided', 'Voided']]);
@@ -46,7 +47,7 @@ async function exportCsv() {
 <template>
   <section>
     <PageHeader title="Tuition payments" subtitle="Journal of every tuition payment received, with its receipt.">
-      <button class="btn secondary" :disabled="exporting" @click="exportCsv"><AppIcon name="download" />Export CSV</button>
+      <ExportMenu :busy="exporting" @export="exportList" />
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>

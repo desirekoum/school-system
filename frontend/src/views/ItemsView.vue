@@ -24,5 +24,6 @@ const { can } = useAuth();
 
 <template>
   <CrudPage title="Items for sale" singular="item" subtitle="Uniforms, books, supplies and services the school sells to students. Stock goes up with purchases and down with sales."
-            :api="itemsApi" :readonly="!can('items:write')" :fields="fields" />
+            :api="itemsApi" :readonly="!can('items:write')" :fields="fields"
+            :imports="[{ entity: 'items', label: 'Items for sale' }]" export-name="items" />
 </template>

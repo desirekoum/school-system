@@ -17,5 +17,6 @@ const { can } = useAuth();
 
 <template>
   <CrudPage title="Courses" singular="course" subtitle="Subjects taught, with coefficients and weekly hours."
-            :api="coursesApi" :readonly="!can('academics:write')" :fields="fields" />
+            :api="coursesApi" :readonly="!can('academics:write')" :fields="fields"
+            :imports="[{ entity: 'courses', label: 'Courses' }]" export-name="courses" />
 </template>

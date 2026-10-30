@@ -113,3 +113,15 @@ export const usersApi = {
   unlock: (id) => http.post(`/users/${id}/unlock`).then((r) => r.data),
   signOut: (id) => http.post(`/users/${id}/sign-out`).then((r) => r.data),
 };
+
+const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+// Excel imports: the file is sent as the raw request body (no multipart form needed)
+export const importApi = {
+  template: async (entity) => {
+    const { data } = await http.get(`/import/${entity}/template`, { responseType: 'blob' });
+    const { saveBlob } = await import('../utils/xlsx');
+    saveBlob(data, `schooldoc-${entity}-template.xlsx`);
+  },
+  run: (entity, file, dryRun) =>
+    http.post(`/import/${entity}`, file, { params: { dry_run: dryRun ? 1 : undefined }, headers: { 'Content-Type': XLSX_TYPE } }).then((r) => r.data),
+};
