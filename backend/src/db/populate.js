@@ -648,7 +648,7 @@ async function populate() {
     }
     const slots = await insertMany(client, 'timetable_slots', slotRows, 'id, class_id, course_id, weekday, start_time, end_time');
 
-    // --- Attendance of the last two weeks of classes (today's classes are left for the teachers to take) ---
+    // --- Attendance of the last two weeks of classes ---
     const nowIso = new Date().toISOString().slice(0, 10);
     const { rows: [yearRange] } = await client.query('SELECT start_date FROM academic_years WHERE name = $1', [ACADEMIC_YEAR]);
     const rosterOf = {};
@@ -657,11 +657,14 @@ async function populate() {
     // Some students miss school more often than others
     const absentee = Object.fromEntries(studentIds.map((id) => [id, chance(0.1) ? 4 : 1]));
     let sessionCount = 0, recordCount = 0;
-    for (let back = 14; back >= 1; back--) {
+    // School time now: today's classes that are already over are taken too, the others are left to the teachers
+    const { rows: [clock] } = await client.query("SELECT to_char(now() AT TIME ZONE $1, 'HH24:MI') AS t", [process.env.SCHOOL_TZ ?? 'Africa/Douala']);
+    for (let back = 14; back >= 0; back--) {
       const date = new Date(Date.parse(nowIso) - back * 86400000).toISOString().slice(0, 10);
       const weekday = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
       if (weekday === 7 || date < yearRange.start_date) continue;
-      const daySlots = slots.filter((sl) => sl.weekday === weekday);
+      const daySlots = slots.filter((sl) => sl.weekday === weekday && (back > 0 || sl.end_time.slice(0, 5) < clock.t));
+      if (!daySlots.length) continue;
       const sessions = await insertMany(client, 'attendance_sessions', daySlots.map((sl) => ({
         slot_id: sl.id, class_id: sl.class_id, course_id: sl.course_id, teacher_id: teacherOf[`${sl.class_id}:${sl.course_id}`],
         date, start_time: sl.start_time, end_time: sl.end_time,

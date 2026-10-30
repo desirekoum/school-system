@@ -7,7 +7,10 @@ import { can } from '../modules/auth/roles.js';
  * A request that matches no rule is refused (deny by default), except for the system administrator.
  * Paths are relative to /api. 'WRITE' = any method that changes data (POST, PUT, PATCH, DELETE).
  */
+export const SIGNED_IN = 'signed-in';   // any signed-in user (the handler decides what they see)
+
 const ACCESS = [
+  ['GET', /^\/dashboard$/, SIGNED_IN],
   ['*', /^\/users(\/|$)/, 'users:manage'],
 
   // Excel imports (template + upload) need the right to write what is imported
@@ -81,7 +84,7 @@ export function requireAuth(req, res, next) {
 export function authorize(req, res, next) {
   const perm = requiredPermission(req.method, req.path);
   const perms = perm ? [].concat(perm) : [];
-  if (req.user.role === 'admin' || perms.some((p) => can(req.user, p))) return next();
+  if (req.user.role === 'admin' || perm === SIGNED_IN || perms.some((p) => can(req.user, p))) return next();
   throw new HttpError(403, perm ? `Your role cannot do this (needs ${perms.join(' or ')})` : 'Access denied');
 }
 
