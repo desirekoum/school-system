@@ -7,6 +7,7 @@ import StatusBadge from '../components/StatusBadge.vue';
 import { attendanceApi, classesApi } from '../api/http';
 import { useAuth } from '../composables/useAuth';
 import { longDate, shiftDate } from '../config/attendance';
+import { t } from '../i18n';
 
 /**
  * The classes of a day and whether attendance was taken.
@@ -48,15 +49,15 @@ const isToday = computed(() => day.value && date.value === day.value.now.date);
 
 // One status per session: taken (with absences), open now, upcoming, or missed
 function state(s) {
-  if (s.session_id) return { key: 'taken', label: 'Taken' };
-  if (s.window === 'open') return { key: 'open', label: 'Open now' };
-  if (s.window === 'upcoming') return { key: 'upcoming', label: 'Upcoming' };
-  return { key: 'missed', label: 'Not taken' };
+  if (s.session_id) return { key: 'taken', label: t('attendance.taken') };
+  if (s.window === 'open') return { key: 'open', label: t('attendance.openNow') };
+  if (s.window === 'upcoming') return { key: 'upcoming', label: t('attendance.upcoming') };
+  return { key: 'missed', label: t('attendance.notTaken') };
 }
 const counts = (s) => s.counts ?? {};
 const action = (s) => {
-  if (s.can_edit) return s.session_id ? 'Edit' : 'Take attendance';
-  return s.can_view ? 'View' : null;
+  if (s.can_edit) return s.session_id ? t('common.edit') : t('attendance.takeAttendance');
+  return s.can_view ? t('attendance.view') : null;
 };
 
 const stats = computed(() => {
@@ -73,8 +74,8 @@ const stats = computed(() => {
 
 <template>
   <section>
-    <PageHeader title="Attendance" :subtitle="office ? 'Roll call of every class, per day. The office can record or correct any past day.' : 'Take the roll call of your classes while they happen.'">
-      <RouterLink to="/attendance/reports" class="btn secondary"><AppIcon name="chart" />Reports</RouterLink>
+    <PageHeader :title="t('attendance.title')" :subtitle="office ? t('attendance.subtitleOffice') : t('attendance.subtitleTeacher')">
+      <RouterLink to="/attendance/reports" class="btn secondary"><AppIcon name="chart" />{{ t('attendance.reports') }}</RouterLink>
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
@@ -82,32 +83,32 @@ const stats = computed(() => {
     <div class="card">
       <div class="toolbar">
         <div class="date-nav">
-          <button class="icon-btn" title="Previous day" @click="date = shiftDate(date, -1)"><AppIcon name="chevronLeft" /></button>
-          <input v-model="date" type="date" aria-label="Date" />
-          <button class="icon-btn" title="Next day" @click="date = shiftDate(date, 1)"><AppIcon name="chevronRight" /></button>
-          <button v-if="!isToday && day" class="btn secondary sm" @click="date = day.now.date">Today</button>
+          <button class="icon-btn" :title="t('common.previousDay')" @click="date = shiftDate(date, -1)"><AppIcon name="chevronLeft" /></button>
+          <input v-model="date" type="date" :aria-label="t('common.date')" />
+          <button class="icon-btn" :title="t('common.nextDay')" @click="date = shiftDate(date, 1)"><AppIcon name="chevronRight" /></button>
+          <button v-if="!isToday && day" class="btn secondary sm" @click="date = day.now.date">{{ t('common.today') }}</button>
         </div>
-        <select v-if="office" v-model="classId" aria-label="Class">
-          <option value="">All classes</option>
+        <select v-if="office" v-model="classId" :aria-label="t('common.class')">
+          <option value="">{{ t('attendance.allClasses') }}</option>
           <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}</option>
         </select>
       </div>
 
       <div v-if="day" class="day-summary">
         <div>
-          <p class="strong">{{ longDate(day.date) }}<span v-if="isToday" class="pill" style="margin-left: .5rem">Today · {{ day.now.time }}</span></p>
-          <p v-if="day.outside_year" class="muted small">This date is outside the academic year {{ day.academic_year }}.</p>
+          <p class="strong">{{ longDate(day.date) }}<span v-if="isToday" class="pill" style="margin-left: .5rem">{{ t('attendance.todayAt', { time: day.now.time }) }}</span></p>
+          <p v-if="day.outside_year" class="muted small">{{ t('attendance.outsideYear', { year: day.academic_year }) }}</p>
         </div>
         <div class="mini-stats">
-          <span><b>{{ stats.taken }}</b>/{{ stats.total }} taken</span>
-          <span v-if="stats.missed" class="text-danger"><b>{{ stats.missed }}</b> not taken</span>
-          <span><b>{{ stats.absent }}</b> absences</span>
+          <span>{{ t('attendance.takenOf', { taken: stats.taken, total: stats.total }) }}</span>
+          <span v-if="stats.missed" class="text-danger">{{ t('attendance.notTakenN', { n: stats.missed }) }}</span>
+          <span>{{ t('attendance.absencesN', { n: stats.absent }) }}</span>
         </div>
       </div>
 
       <div class="table-wrap" :class="{ 'is-loading': loading }">
         <table class="table">
-          <thead><tr><th>Time</th><th>Class</th><th>Course</th><th v-if="office">Teacher</th><th>Roll call</th><th class="right">Action</th></tr></thead>
+          <thead><tr><th>{{ t('common.time') }}</th><th>{{ t('common.class') }}</th><th>{{ t('common.course') }}</th><th v-if="office">{{ t('common.teacher') }}</th><th>{{ t('attendance.rollCall') }}</th><th class="right">{{ t('attendance.action') }}</th></tr></thead>
           <tbody>
             <tr v-for="s in day?.sessions ?? []" :key="s.id" :class="{ 'row-live': s.window === 'open' && isToday }">
               <td class="mono nowrap">{{ s.start_time }}–{{ s.end_time }}</td>
@@ -117,7 +118,7 @@ const stats = computed(() => {
               <td>
                 <StatusBadge :value="state(s).key" :label="state(s).label" />
                 <span v-if="s.session_id" class="muted small att-counts">
-                  {{ counts(s).absent ?? 0 }} absent<template v-if="counts(s).late"> · {{ counts(s).late }} late</template> / {{ s.students }}
+                  {{ t('attendance.absentN', { n: counts(s).absent ?? 0 }) }}<template v-if="counts(s).late"> · {{ t('attendance.lateN', { n: counts(s).late }) }}</template> / {{ s.students }}
                 </span>
               </td>
               <td class="right">
@@ -130,8 +131,8 @@ const stats = computed(() => {
         </table>
         <div v-if="day && !day.sessions.length" class="empty">
           <AppIcon name="calendar" size="32" />
-          <p>No class scheduled {{ isToday ? 'today' : 'on this day' }}{{ office ? '' : ' for you' }}.</p>
-          <RouterLink to="/timetable" class="btn secondary">See the timetable</RouterLink>
+          <p>{{ t(isToday ? 'attendance.noClassToday' : 'attendance.noClassDay') }}{{ office ? '' : t('attendance.forYou') }}.</p>
+          <RouterLink to="/timetable" class="btn secondary">{{ t('attendance.seeTimetable') }}</RouterLink>
         </div>
       </div>
     </div>

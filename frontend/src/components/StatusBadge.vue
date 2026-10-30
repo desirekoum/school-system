@@ -1,4 +1,6 @@
 <script setup>
+import { t, te } from '../i18n';
+
 // Maps any status value to a color tone; unknown values fall back to neutral
 const TONES = {
   active: 'success', confirmed: 'success',
@@ -17,6 +19,6 @@ defineProps({ value: [String, Boolean], label: String });
 </script>
 
 <template>
-  <span v-if="value !== undefined && value !== null && value !== ''" :class="['badge', TONES[value] ?? 'neutral']"><i class="dot" />{{ label ?? value }}</span>
+  <span v-if="value !== undefined && value !== null && value !== ''" :class="['badge', TONES[value] ?? 'neutral']"><i class="dot" />{{ label ?? (te(`options.status.${value}`) ? t(`options.status.${value}`) : value) }}</span>
   <span v-else class="muted">—</span>
 </template>

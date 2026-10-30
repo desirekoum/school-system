@@ -3,34 +3,36 @@ import { ref, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import AppIcon from './components/AppIcon.vue';
 import UserMenu from './components/UserMenu.vue';
+import LanguageSwitch from './components/LanguageSwitch.vue';
+import { t } from './i18n';
 import logo from './assets/logo.png';
 import { useAuth } from './composables/useAuth';
 import { academicYearsApi } from './api/http';
 
 const nav = [
-  { group: 'Overview', items: [{ to: '/', label: 'Dashboard', icon: 'dashboard', exact: true }] },
-  { group: 'People', items: [
-    { to: '/students', perm: 'students:read', label: 'Students', icon: 'students' },
-    { to: '/teachers', perm: 'staff:read', label: 'Teachers', icon: 'teachers' },
+  { group: 'overview', items: [{ to: '/', label: 'dashboard', icon: 'dashboard', exact: true }] },
+  { group: 'people', items: [
+    { to: '/students', perm: 'students:read', label: 'students', icon: 'students' },
+    { to: '/teachers', perm: 'staff:read', label: 'teachers', icon: 'teachers' },
   ] },
-  { group: 'Academics', items: [
-    { to: '/academic-years', perm: 'academics:read', label: 'Academic years', icon: 'calendar' },
-    { to: '/registrations', perm: 'registrations:read', label: 'Registrations', icon: 'registrations' },
-    { to: '/classes', perm: 'academics:read', label: 'Classes', icon: 'classes' },
-    { to: '/courses', perm: 'academics:read', label: 'Courses', icon: 'courses' },
-    { to: '/timetable', perm: 'academics:read', label: 'Timetable', icon: 'grid' },
-    { to: '/attendance', perm: ['attendance:take', 'attendance:read', 'attendance:manage'], label: 'Attendance', icon: 'userCheck', exact: true },
-    { to: '/attendance/reports', perm: ['attendance:read', 'attendance:take'], label: 'Attendance reports', icon: 'chart' },
+  { group: 'academics', items: [
+    { to: '/academic-years', perm: 'academics:read', label: 'academicYears', icon: 'calendar' },
+    { to: '/registrations', perm: 'registrations:read', label: 'registrations', icon: 'registrations' },
+    { to: '/classes', perm: 'academics:read', label: 'classes', icon: 'classes' },
+    { to: '/courses', perm: 'academics:read', label: 'courses', icon: 'courses' },
+    { to: '/timetable', perm: 'academics:read', label: 'timetable', icon: 'grid' },
+    { to: '/attendance', perm: ['attendance:take', 'attendance:read', 'attendance:manage'], label: 'attendance', icon: 'userCheck', exact: true },
+    { to: '/attendance/reports', perm: ['attendance:read', 'attendance:take'], label: 'attendanceReports', icon: 'chart' },
   ] },
-  { group: 'Finances', items: [
-    { to: '/finances', perm: 'finance:read', label: 'Tuition & accounts', icon: 'wallet', exact: true },
-    { to: '/finances/payments', perm: 'finance:read', label: 'Tuition payments', icon: 'receipt' },
-    { to: '/finances/sales', perm: 'sales:read', label: 'Sales', icon: 'cart' },
-    { to: '/finances/items', perm: 'items:read', label: 'Items for sale', icon: 'tag' },
-    { to: '/finances/expenses', perm: 'expenses:read', label: 'Expenses', icon: 'expense' },
-    { to: '/finances/reports', perm: 'reports:read', label: 'Financial reports', icon: 'chart' },
+  { group: 'finances', items: [
+    { to: '/finances', perm: 'finance:read', label: 'tuition', icon: 'wallet', exact: true },
+    { to: '/finances/payments', perm: 'finance:read', label: 'payments', icon: 'receipt' },
+    { to: '/finances/sales', perm: 'sales:read', label: 'sales', icon: 'cart' },
+    { to: '/finances/items', perm: 'items:read', label: 'items', icon: 'tag' },
+    { to: '/finances/expenses', perm: 'expenses:read', label: 'expenses', icon: 'expense' },
+    { to: '/finances/reports', perm: 'reports:read', label: 'financialReports', icon: 'chart' },
   ] },
-  { group: 'Administration', items: [{ to: '/users', perm: 'users:manage', label: 'Users & roles', icon: 'shield' }] },
+  { group: 'administration', items: [{ to: '/users', perm: 'users:manage', label: 'users', icon: 'shield' }] },
 ];
 
 // Only the pages the role can open; a group with no page left is hidden
@@ -62,17 +64,17 @@ const bare = computed(() => route.meta.public || route.meta.bare);
   <div v-else class="layout" :class="{ 'nav-open': open }">
     <aside class="sidebar">
       <RouterLink to="/" class="brand">
-        <img :src="logo" alt="SchoolDoc logo" />
+        <img :src="logo" :alt="t('nav.logoAlt')" />
         <span>School<b>Doc</b></span>
       </RouterLink>
       <nav>
         <div v-for="g in visibleNav" :key="g.group" class="nav-group">
-          <p class="nav-title">{{ g.group }}</p>
+          <p class="nav-title">{{ t(`nav.${g.group}`) }}</p>
           <!-- exact match for "/" and "/finances", so they aren't highlighted on their sub-pages -->
           <RouterLink v-for="i in g.items" :key="i.to" :to="i.to" class="nav-link"
                       :exact-active-class="i.exact ? 'active' : ''"
                       :active-class="i.exact ? '' : 'active'">
-            <AppIcon :name="i.icon" />{{ i.label }}
+            <AppIcon :name="i.icon" />{{ t(`nav.${i.label}`) }}
           </RouterLink>
         </div>
       </nav>
@@ -82,14 +84,15 @@ const bare = computed(() => route.meta.public || route.meta.bare);
     <div class="main">
       <!-- Top bar: menu button and logo on mobile; academic year and the user menu on the right -->
       <header class="topbar">
-        <button class="icon-btn menu-btn" aria-label="Open menu" @click="open = true"><AppIcon name="menu" /></button>
+        <button class="icon-btn menu-btn" :aria-label="t('nav.openMenu')" @click="open = true"><AppIcon name="menu" /></button>
         <RouterLink to="/" class="brand mobile-brand"><img :src="logo" alt="" /><span>School<b>Doc</b></span></RouterLink>
         <div class="topbar-right">
-          <component :is="can('academics:read') ? 'RouterLink' : 'span'" to="/academic-years" class="year-chip" title="Academic year">
+          <component :is="can('academics:read') ? 'RouterLink' : 'span'" to="/academic-years" class="year-chip" :title="t('common.academicYear')">
             <AppIcon name="calendar" size="16" />
-            <span class="year-label">Academic year</span>
+            <span class="year-label">{{ t('common.academicYear') }}</span>
             <b>{{ academicYear.replace('-', '–') }}</b>
           </component>
+          <LanguageSwitch />
           <UserMenu />
         </div>
       </header>
@@ -98,7 +101,7 @@ const bare = computed(() => route.meta.public || route.meta.bare);
           <Transition name="fade" mode="out-in"><component :is="Component" :key="route.fullPath" /></Transition>
         </RouterView>
       </main>
-      <footer class="app-footer">© {{ now.getFullYear() }} Bytes-Corp. All rights reserved.</footer>
+      <footer class="app-footer">{{ t('common.footer', { year: now.getFullYear() }) }}</footer>
     </div>
   </div>
 </template>

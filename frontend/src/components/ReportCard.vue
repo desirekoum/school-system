@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import AppIcon from './AppIcon.vue';
 import { studentsApi } from '../api/http';
 import { scoreTone, fmt, mention, ordinal } from '../config/grading';
+import { t } from '../i18n';
 
 /** Report card (bulletin) of a student for one academic year. */
 const props = defineProps({ studentId: { type: [String, Number], required: true } });
@@ -27,25 +28,25 @@ async function load() {
 watch(year, (now, before) => before !== undefined && load());
 load();
 
-const examsOf = (t) => card.value.exams.filter((e) => e.trimester === t);
+const examsOf = (tri) => card.value.exams.filter((e) => e.trimester === tri);
 const print = () => window.print();
 </script>
 
 <template>
   <div class="card">
     <div class="card-header">
-      <h2>Report card</h2>
+      <h2>{{ t('grades.reportCard') }}</h2>
       <div v-if="card?.registration" class="row-actions no-print">
         <select v-if="card.years.length > 1" v-model="year" style="width: auto; height: 32px">
           <option v-for="y in card.years" :key="y" :value="y">{{ y }}</option>
         </select>
-        <button class="btn secondary sm" @click="print"><AppIcon name="printer" size="14" />Print</button>
+        <button class="btn secondary sm" @click="print"><AppIcon name="printer" size="14" />{{ t('common.print') }}</button>
       </div>
     </div>
 
     <div v-if="error" class="alert" style="margin: 1rem"><AppIcon name="alert" />{{ error }}</div>
-    <div v-else-if="loading && !card" class="empty">Loading…</div>
-    <div v-else-if="card && !card.registration" class="empty"><p>No registration, so no grades yet.</p></div>
+    <div v-else-if="loading && !card" class="empty">{{ t('common.loading') }}</div>
+    <div v-else-if="card && !card.registration" class="empty"><p>{{ t('grades.noGrades') }}</p></div>
 
     <template v-else-if="card">
       <p class="muted small" style="padding: .75rem 1.25rem 0">
@@ -55,15 +56,15 @@ const print = () => window.print();
         <table class="table report">
           <thead>
             <tr>
-              <th rowspan="2">Course</th>
-              <th rowspan="2">Coef.</th>
-              <th v-for="t in [1, 2, 3]" :key="t" :colspan="examsOf(t).length + 1">Trimester {{ t }}</th>
-              <th rowspan="2" class="avg-col">Year</th>
+              <th rowspan="2">{{ t('common.course') }}</th>
+              <th rowspan="2">{{ t('grades.coefShort') }}</th>
+              <th v-for="tri in [1, 2, 3]" :key="tri" :colspan="examsOf(tri).length + 1">{{ t('grades.trimesterN', { n: tri }) }}</th>
+              <th rowspan="2" class="avg-col">{{ t('grades.year') }}</th>
             </tr>
             <tr>
-              <template v-for="t in [1, 2, 3]" :key="t">
-                <th v-for="e in examsOf(t)" :key="e.id">Exam {{ e.number }}</th>
-                <th class="avg-col">Avg</th>
+              <template v-for="tri in [1, 2, 3]" :key="tri">
+                <th v-for="e in examsOf(tri)" :key="e.id">{{ t('grades.examN', { n: e.number }) }}</th>
+                <th class="avg-col">{{ t('grades.avg') }}</th>
               </template>
             </tr>
           </thead>
@@ -71,24 +72,24 @@ const print = () => window.print();
             <tr v-for="c in card.courses" :key="c.id">
               <td><span class="strong">{{ c.name }}</span></td>
               <td>{{ c.coefficient }}</td>
-              <template v-for="t in [1, 2, 3]" :key="t">
-                <td v-for="e in examsOf(t)" :key="e.id" :class="scoreTone(c.scores[e.id])">{{ fmt(c.scores[e.id]) }}</td>
-                <td class="avg-col" :class="scoreTone(c.trimester_avgs[t - 1])">{{ fmt(c.trimester_avgs[t - 1]) }}</td>
+              <template v-for="tri in [1, 2, 3]" :key="tri">
+                <td v-for="e in examsOf(tri)" :key="e.id" :class="scoreTone(c.scores[e.id])">{{ fmt(c.scores[e.id]) }}</td>
+                <td class="avg-col" :class="scoreTone(c.trimester_avgs[tri - 1])">{{ fmt(c.trimester_avgs[tri - 1]) }}</td>
               </template>
               <td class="avg-col" :class="scoreTone(c.year_avg)">{{ fmt(c.year_avg) }}</td>
             </tr>
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="2">General average</td>
+              <td colspan="2">{{ t('grades.generalAverage') }}</td>
               <template v-for="(s, i) in card.summary.slice(0, 3)" :key="i">
-                <td :colspan="examsOf(i + 1).length" class="muted small">class avg {{ fmt(s.class_average) }}</td>
+                <td :colspan="examsOf(i + 1).length" class="muted small">{{ t('grades.classAvg', { n: fmt(s.class_average) }) }}</td>
                 <td class="avg-col" :class="scoreTone(s.general_avg)">{{ fmt(s.general_avg) }}</td>
               </template>
               <td class="avg-col" :class="scoreTone(card.summary[3].general_avg)">{{ fmt(card.summary[3].general_avg) }}</td>
             </tr>
             <tr>
-              <td colspan="2">Rank</td>
+              <td colspan="2">{{ t('grades.rank') }}</td>
               <template v-for="(s, i) in card.summary.slice(0, 3)" :key="i">
                 <td :colspan="examsOf(i + 1).length + 1">{{ ordinal(s.rank) }} / {{ s.class_size }}</td>
               </template>
@@ -98,7 +99,7 @@ const print = () => window.print();
         </table>
       </div>
       <p class="card-foot" style="background: var(--gray-25); color: var(--text)">
-        <AppIcon name="award" size="16" /> Year: <b :class="scoreTone(card.summary[3].general_avg)">{{ fmt(card.summary[3].general_avg) }} / 20</b>
+        <AppIcon name="award" size="16" /> {{ t('grades.yearLabel') }} <b :class="scoreTone(card.summary[3].general_avg)">{{ fmt(card.summary[3].general_avg) }} / 20</b>
         · {{ mention(card.summary[3].general_avg) }}
       </p>
     </template>

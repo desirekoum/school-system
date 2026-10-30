@@ -9,6 +9,7 @@ import PaginationBar from '../components/PaginationBar.vue';
 import { usersApi, teachersApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { useAuth } from '../composables/useAuth';
+import { t, fmtDateTime } from '../i18n';
 
 const { user: me } = useAuth();
 const tab = ref('users');
@@ -19,22 +20,22 @@ onMounted(async () => {
   ({ roles: roles.value, permissions: permissions.value } = await usersApi.roles());
 });
 
-const MFA = { totp: 'Authenticator app', email: 'Email code', sms: 'SMS code' };
+const MFA = ['totp', 'email', 'sms'];
+const mfaLabel = (k) => t(`users.mfa.${k}`);
 const MFA_ICON = { totp: 'phone', email: 'mail', sms: 'phone' };
-const EVENT_LABELS = {
-  login: 'Signed in', login_failed: 'Failed sign-in', code_failed: 'Wrong code', locked: 'Account locked', logout: 'Signed out',
-  password_changed: 'Password changed', password_reset: 'Password reset', mfa_reset: 'Authenticator reset', unlocked: 'Unlocked',
-  user_created: 'Account created', user_updated: 'Account updated', user_deleted: 'Account deleted', signed_out: 'Sessions ended',
-  admin_created: 'Admin created',
-};
+const EVENTS = ['login', 'login_failed', 'code_failed', 'locked', 'logout', 'password_changed', 'password_reset', 'mfa_reset', 'unlocked',
+  'user_created', 'user_updated', 'user_deleted', 'signed_out', 'admin_created'];
+const eventLabel = (e) => (EVENTS.includes(e) ? t(`users.events.${e}`) : e);
+// Role names, descriptions and permission texts come from the translations (the API sends English)
+const roleLabel = (k) => t(`options.role.${k}`);
 const EVENT_TONE = { login_failed: 'danger', code_failed: 'danger', locked: 'danger', login: 'success' };
-const when = (d) => (d ? new Date(d).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+const when = (d) => fmtDateTime(d);
 
 // ---------- Users list ----------
 const { items, total, totalPages, page, pageSize, search, filters, loading, error, load } = usePaginatedList(
   (params) => usersApi.list(params), { filters: { role: '', is_active: '' } });
 
-const statusOf = (u) => (!u.is_active ? ['false', 'Inactive'] : u.locked ? ['cancelled', 'Locked'] : u.must_change_password ? ['pending', 'Must change password'] : ['active', 'Active']);
+const statusOf = (u) => (!u.is_active ? ['false', t('users.inactive')] : u.locked ? ['cancelled', t('users.locked')] : u.must_change_password ? ['pending', t('users.mustChange')] : ['active', t('users.active')]);
 
 // ---------- Create / edit ----------
 const form = ref(null);
@@ -55,11 +56,11 @@ async function openForm(u = null) {
 
 // Picking a teacher fills the name and email from the staff record
 function onTeacher() {
-  const t = teachers.value.find((x) => x.id === Number(form.value.teacher_id));
-  if (!t) return;
-  form.value.full_name ||= `${t.first_name} ${t.last_name}`;
-  form.value.email ||= t.email ?? '';
-  form.value.phone ||= t.phone ?? '';
+  const tc = teachers.value.find((x) => x.id === Number(form.value.teacher_id));
+  if (!tc) return;
+  form.value.full_name ||= `${tc.first_name} ${tc.last_name}`;
+  form.value.email ||= tc.email ?? '';
+  form.value.phone ||= tc.phone ?? '';
 }
 
 async function submit() {
@@ -96,12 +97,12 @@ async function act(fn, confirmText) {
     formError.value = e.message;
   }
 }
-const resetPassword = () => act(() => usersApi.resetPassword(form.value.id), `Reset the password of ${form.value.full_name}? Their sessions end and a temporary password is created.`);
-const resetMfa = () => act(() => usersApi.resetMfa(form.value.id), `Reset the authenticator of ${form.value.full_name}? They scan a new QR code at the next sign-in.`);
+const resetPassword = () => act(() => usersApi.resetPassword(form.value.id), t('users.confirmReset', { name: form.value.full_name }));
+const resetMfa = () => act(() => usersApi.resetMfa(form.value.id), t('users.confirmMfa', { name: form.value.full_name }));
 const unlock = () => act(() => usersApi.unlock(form.value.id));
-const signOutAll = () => act(() => usersApi.signOut(form.value.id), `End every open session of ${form.value.full_name}?`);
+const signOutAll = () => act(() => usersApi.signOut(form.value.id), t('users.confirmSignOut', { name: form.value.full_name }));
 async function remove() {
-  if (!confirm(`Delete the account of ${form.value.full_name}? Deactivating keeps the history and is usually better.`)) return;
+  if (!confirm(t('users.confirmDelete', { name: form.value.full_name }))) return;
   try {
     await usersApi.remove(form.value.id);
     form.value = null;
@@ -134,25 +135,25 @@ const log = usePaginatedList((params) => usersApi.events(params), { filters: { e
 
 <template>
   <section>
-    <PageHeader title="Users & roles" subtitle="Accounts that can sign in, what each role may do, and the security log.">
-      <button v-if="tab === 'users'" class="btn primary" @click="openForm()"><AppIcon name="plus" />New user</button>
+    <PageHeader :title="t('users.title')" :subtitle="t('users.subtitle')">
+      <button v-if="tab === 'users'" class="btn primary" @click="openForm()"><AppIcon name="plus" />{{ t('users.new') }}</button>
     </PageHeader>
 
     <div class="tabs-bar">
-      <button :class="{ active: tab === 'users' }" @click="tab = 'users'"><AppIcon name="teachers" size="16" />Users</button>
-      <button :class="{ active: tab === 'roles' }" @click="tab = 'roles'"><AppIcon name="shield" size="16" />Roles & permissions</button>
-      <button :class="{ active: tab === 'log' }" @click="tab = 'log'; log.load()"><AppIcon name="clock" size="16" />Security log</button>
+      <button :class="{ active: tab === 'users' }" @click="tab = 'users'"><AppIcon name="teachers" size="16" />{{ t('users.tabUsers') }}</button>
+      <button :class="{ active: tab === 'roles' }" @click="tab = 'roles'"><AppIcon name="shield" size="16" />{{ t('users.tabRoles') }}</button>
+      <button :class="{ active: tab === 'log' }" @click="tab = 'log'; log.load()"><AppIcon name="clock" size="16" />{{ t('users.tabLog') }}</button>
     </div>
 
     <!-- One-time temporary password -->
     <div v-if="secret" class="card" style="margin-bottom: 1rem; padding: 1rem 1.25rem; display: grid; gap: .6rem">
-      <p class="strong"><AppIcon name="key" size="16" /> {{ secret.created ? 'Account created' : 'Password reset' }} for <span class="mono">{{ secret.username }}</span></p>
+      <i18n-t keypath="users.forX" tag="p" class="strong" scope="global"><template #what><AppIcon name="key" size="16" /> {{ secret.created ? t('users.created') : t('users.reset') }}</template><template #user><span class="mono">{{ secret.username }}</span></template></i18n-t>
       <div class="secret-box">
         <code>{{ secret.password }}</code>
-        <button class="btn secondary" @click="copySecret"><AppIcon :name="copied ? 'check' : 'copy'" size="16" />{{ copied ? 'Copied' : 'Copy' }}</button>
+        <button class="btn secondary" @click="copySecret"><AppIcon :name="copied ? 'check' : 'copy'" size="16" />{{ copied ? t('users.copied') : t('users.copy') }}</button>
       </div>
-      <p class="muted small">Give this temporary password to the user in person. It is shown only once; they must change it at their first sign-in.</p>
-      <div><button class="btn secondary" @click="secret = null">Done</button></div>
+      <p class="muted small">{{ t('users.secretHelp') }}</p>
+      <div><button class="btn secondary" @click="secret = null">{{ t('users.done') }}</button></div>
     </div>
 
     <template v-if="tab === 'users'">
@@ -161,21 +162,21 @@ const log = usePaginatedList((params) => usersApi.events(params), { filters: { e
         <div class="toolbar filters">
           <label class="search">
             <AppIcon name="search" size="16" />
-            <input v-model="search" type="search" placeholder="Name, username, email, phone…" />
+            <input v-model="search" type="search" :placeholder="t('users.search')" />
           </label>
-          <select v-model="filters.role" aria-label="Role">
-            <option value="">All roles</option>
-            <option v-for="(r, key) in roles" :key="key" :value="key">{{ r.label }}</option>
+          <select v-model="filters.role" :aria-label="t('fields.role')">
+            <option value="">{{ t('users.allRoles') }}</option>
+            <option v-for="(r, key) in roles" :key="key" :value="key">{{ roleLabel(key) }}</option>
           </select>
-          <select v-model="filters.is_active" aria-label="Status">
-            <option value="">Active and inactive</option>
-            <option value="true">Active only</option>
-            <option value="false">Inactive only</option>
+          <select v-model="filters.is_active" :aria-label="t('common.status')">
+            <option value="">{{ t('users.activeAndInactive') }}</option>
+            <option value="true">{{ t('users.activeOnly') }}</option>
+            <option value="false">{{ t('users.inactiveOnly') }}</option>
           </select>
         </div>
         <div class="table-wrap" :class="{ 'is-loading': loading && items.length }">
           <table class="table">
-            <thead><tr><th>User</th><th>Role</th><th>Second factor</th><th>Status</th><th>Last sign-in</th><th /></tr></thead>
+            <thead><tr><th>{{ t('users.user') }}</th><th>{{ t('fields.role') }}</th><th>{{ t('users.secondFactor') }}</th><th>{{ t('common.status') }}</th><th>{{ t('users.lastSignIn') }}</th><th /></tr></thead>
             <tbody>
               <tr v-for="u in items" :key="u.id" class="clickable" @click="openForm(u)">
                 <td>
@@ -184,16 +185,16 @@ const log = usePaginatedList((params) => usersApi.events(params), { filters: { e
                     <div><div class="strong">{{ u.full_name }}</div><div class="muted small mono">{{ u.username }}</div></div>
                   </div>
                 </td>
-                <td><span class="pill">{{ roles[u.role]?.label ?? u.role }}</span><div v-if="u.teacher" class="muted small">{{ u.teacher }}</div></td>
-                <td><AppIcon :name="MFA_ICON[u.mfa_method]" size="14" /> {{ MFA[u.mfa_method] }}
-                  <div v-if="u.mfa_method === 'totp' && !u.totp_confirmed" class="muted small">QR not scanned yet</div></td>
+                <td><span class="pill">{{ roleLabel(u.role) }}</span><div v-if="u.teacher" class="muted small">{{ u.teacher }}</div></td>
+                <td><AppIcon :name="MFA_ICON[u.mfa_method]" size="14" /> {{ mfaLabel(u.mfa_method) }}
+                  <div v-if="u.mfa_method === 'totp' && !u.totp_confirmed" class="muted small">{{ t('users.qrPending') }}</div></td>
                 <td><StatusBadge :value="statusOf(u)[0]" :label="statusOf(u)[1]" /></td>
                 <td class="muted small">{{ when(u.last_login_at) }}</td>
-                <td class="right"><button class="icon-btn" title="Edit" @click.stop="openForm(u)"><AppIcon name="edit" size="16" /></button></td>
+                <td class="right"><button class="icon-btn" :title="t('common.edit')" @click.stop="openForm(u)"><AppIcon name="edit" size="16" /></button></td>
               </tr>
             </tbody>
           </table>
-          <div v-if="!loading && !items.length" class="empty"><AppIcon name="inbox" size="32" /><p>No user matches.</p></div>
+          <div v-if="!loading && !items.length" class="empty"><AppIcon name="inbox" size="32" /><p>{{ t('users.none') }}</p></div>
         </div>
         <PaginationBar v-if="total" v-model:page="page" v-model:page-size="pageSize" :total="total" :total-pages="totalPages" />
       </div>
@@ -202,27 +203,27 @@ const log = usePaginatedList((params) => usersApi.events(params), { filters: { e
     <template v-else-if="tab === 'roles'">
       <div class="role-cards">
         <div v-for="(r, key) in roles" :key="key" class="card role-card">
-          <p class="strong"><AppIcon :name="key === 'admin' ? 'shield' : 'teachers'" size="16" /> {{ r.label }}</p>
-          <p class="muted small">{{ r.description }}</p>
+          <p class="strong"><AppIcon :name="key === 'admin' ? 'shield' : 'teachers'" size="16" /> {{ roleLabel(key) }}</p>
+          <p class="muted small">{{ t(`options.roleDescription.${key}`) }}</p>
         </div>
       </div>
       <div class="card">
         <div class="table-wrap">
           <table class="table perm-matrix">
-            <thead><tr><th>Permission</th><th v-for="k in roleKeys" :key="k">{{ roles[k].label.replace('System administrator', 'Admin') }}</th></tr></thead>
+            <thead><tr><th>{{ t('users.permission') }}</th><th v-for="k in roleKeys" :key="k">{{ k === 'admin' ? t('users.admin') : roleLabel(k) }}</th></tr></thead>
             <tbody>
               <tr v-for="(label, perm) in permissions" :key="perm">
-                <td><div class="strong small">{{ label }}</div><div class="muted small mono">{{ perm }}</div></td>
+                <td><div class="strong small">{{ t(`options.permission.${perm}`) }}</div><div class="muted small mono">{{ perm }}</div></td>
                 <td v-for="k in roleKeys" :key="k">
-                  <AppIcon v-if="hasPerm(k, perm)" name="check" size="16" class="perm-yes" :aria-label="`${roles[k].label}: yes`" />
-                  <span v-else class="perm-no" aria-label="no">—</span>
+                  <AppIcon v-if="hasPerm(k, perm)" name="check" size="16" class="perm-yes" :aria-label="t('users.yesFor', { role: roleLabel(k) })" />
+                  <span v-else class="perm-no" :aria-label="t('common.no')">—</span>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
-      <p class="muted small" style="margin-top: .75rem">Roles are defined in the code (backend/src/modules/auth/roles.js), so every change is reviewed. Teachers can only grade the courses assigned to them.</p>
+      <p class="muted small" style="margin-top: .75rem">{{ t('users.rolesNote') }}</p>
     </template>
 
     <template v-else>
@@ -230,21 +231,21 @@ const log = usePaginatedList((params) => usersApi.events(params), { filters: { e
         <div class="toolbar filters">
           <label class="search">
             <AppIcon name="search" size="16" />
-            <input v-model="log.search.value" type="search" placeholder="Username, IP, detail…" />
+            <input v-model="log.search.value" type="search" :placeholder="t('users.searchLog')" />
           </label>
-          <select v-model="log.filters.event" aria-label="Event">
-            <option value="">All events</option>
-            <option v-for="(label, key) in EVENT_LABELS" :key="key" :value="key">{{ label }}</option>
+          <select v-model="log.filters.event" :aria-label="t('users.event')">
+            <option value="">{{ t('users.allEvents') }}</option>
+            <option v-for="key in EVENTS" :key="key" :value="key">{{ eventLabel(key) }}</option>
           </select>
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>When</th><th>User</th><th>Event</th><th>Detail</th><th>IP</th></tr></thead>
+            <thead><tr><th>{{ t('users.when') }}</th><th>{{ t('users.user') }}</th><th>{{ t('users.event') }}</th><th>{{ t('users.detail') }}</th><th>IP</th></tr></thead>
             <tbody>
               <tr v-for="e in log.items.value" :key="e.id">
                 <td class="small">{{ when(e.created_at) }}</td>
                 <td class="mono small">{{ e.username ?? '—' }}</td>
-                <td><StatusBadge :value="EVENT_TONE[e.event] === 'danger' ? 'cancelled' : EVENT_TONE[e.event] === 'success' ? 'active' : 'left'" :label="EVENT_LABELS[e.event] ?? e.event" /></td>
+                <td><StatusBadge :value="EVENT_TONE[e.event] === 'danger' ? 'cancelled' : EVENT_TONE[e.event] === 'success' ? 'active' : 'left'" :label="eventLabel(e.event)" /></td>
                 <td class="muted small wrap">{{ e.detail ?? '' }}</td>
                 <td class="muted small mono">{{ e.ip }}</td>
               </tr>
@@ -255,68 +256,68 @@ const log = usePaginatedList((params) => usersApi.events(params), { filters: { e
       </div>
     </template>
 
-    <SlideOver v-if="form" :title="form.id ? form.full_name : 'New user'" @close="form = null">
+    <SlideOver v-if="form" :title="form.id ? form.full_name : t('users.new')" @close="form = null">
       <div v-if="formError" class="alert"><AppIcon name="alert" />{{ formError }}</div>
       <form id="user-form" class="form-grid" @submit.prevent="submit">
-        <label class="field wide"><span>Role<b class="req">*</b></span>
+        <label class="field wide"><span>{{ t('fields.role') }}<b class="req">*</b></span>
           <select v-model="form.role" :disabled="isSelf">
-            <option v-for="(r, key) in roles" :key="key" :value="key">{{ r.label }}</option>
+            <option v-for="(r, key) in roles" :key="key" :value="key">{{ roleLabel(key) }}</option>
           </select>
-          <span class="muted small">{{ roles[form.role]?.description }}</span>
+          <span class="muted small">{{ t(`options.roleDescription.${form.role}`) }}</span>
         </label>
-        <label v-if="form.role === 'teacher'" class="field wide"><span>Teacher record<b class="req">*</b></span>
+        <label v-if="form.role === 'teacher'" class="field wide"><span>{{ t('users.teacherRecord') }}<b class="req">*</b></span>
           <select v-model="form.teacher_id" required @change="onTeacher">
-            <option value="">Choose the teacher…</option>
-            <option v-for="t in teachers" :key="t.id" :value="t.id">{{ t.last_name }} {{ t.first_name }} · {{ t.specialty }}</option>
+            <option value="">{{ t('users.chooseTeacher') }}</option>
+            <option v-for="tc in teachers" :key="tc.id" :value="tc.id">{{ tc.last_name }} {{ tc.first_name }} · {{ tc.specialty }}</option>
           </select>
         </label>
-        <label class="field"><span>Username<b class="req">*</b></span>
-          <input v-model="form.username" :disabled="!!form.id" required pattern="[a-zA-Z0-9._\-]{3,40}" autocapitalize="none" placeholder="e.g. j.mballa" />
+        <label class="field"><span>{{ t('fields.username') }}<b class="req">*</b></span>
+          <input v-model="form.username" :disabled="!!form.id" required pattern="[a-zA-Z0-9._\-]{3,40}" autocapitalize="none" :placeholder="t('users.usernameHint')" />
         </label>
-        <label class="field"><span>Full name<b class="req">*</b></span><input v-model="form.full_name" required /></label>
-        <label class="field"><span>Email<b v-if="needsEmail" class="req">*</b></span><input v-model="form.email" type="email" :required="needsEmail" /></label>
-        <label class="field"><span>Mobile phone<b v-if="needsPhone" class="req">*</b></span><input v-model="form.phone" type="tel" :required="needsPhone" placeholder="+237 6 99 12 34 56" /></label>
+        <label class="field"><span>{{ t('fields.fullName') }}<b class="req">*</b></span><input v-model="form.full_name" required /></label>
+        <label class="field"><span>{{ t('fields.email') }}<b v-if="needsEmail" class="req">*</b></span><input v-model="form.email" type="email" :required="needsEmail" /></label>
+        <label class="field"><span>{{ t('users.mobile') }}<b v-if="needsPhone" class="req">*</b></span><input v-model="form.phone" type="tel" :required="needsPhone" placeholder="+237 6 99 12 34 56" /></label>
         <fieldset class="field wide" style="border: 0; padding: 0; margin: 0">
-          <legend style="margin-bottom: .35rem">Second factor at sign-in</legend>
+          <legend style="margin-bottom: .35rem">{{ t('users.mfaAtSignIn') }}</legend>
           <div class="segmented" style="margin: 0">
-            <button v-for="(label, key) in MFA" :key="key" type="button" :class="{ active: form.mfa_method === key }" @click="form.mfa_method = key">
-              <AppIcon :name="MFA_ICON[key]" size="14" />{{ label }}
+            <button v-for="key in MFA" :key="key" type="button" :class="{ active: form.mfa_method === key }" @click="form.mfa_method = key">
+              <AppIcon :name="MFA_ICON[key]" size="14" />{{ mfaLabel(key) }}
             </button>
           </div>
         </fieldset>
         <label v-if="form.id" class="field wide checkbox">
-          <input v-model="form.is_active" type="checkbox" :disabled="isSelf" /> Account active (an inactive user cannot sign in)
+          <input v-model="form.is_active" type="checkbox" :disabled="isSelf" /> {{ t('users.activeHelp') }}
         </label>
       </form>
 
       <template v-if="detail">
-        <h3 class="section-title">Security</h3>
+        <h3 class="section-title">{{ t('users.security') }}</h3>
         <div class="kv small">
-          <span class="muted">Last sign-in</span><span>{{ when(detail.last_login_at) }}</span>
-          <span class="muted">Password changed</span><span>{{ when(detail.password_changed_at) }}</span>
-          <span class="muted">Open sessions</span><span>{{ detail.active_sessions }}</span>
-          <span v-if="detail.locked" class="muted">Locked until</span><span v-if="detail.locked" style="color: var(--danger)">{{ when(detail.locked_until) }}</span>
+          <span class="muted">{{ t('users.lastSignIn') }}</span><span>{{ when(detail.last_login_at) }}</span>
+          <span class="muted">{{ t('users.passwordChanged') }}</span><span>{{ when(detail.password_changed_at) }}</span>
+          <span class="muted">{{ t('users.sessions') }}</span><span>{{ detail.active_sessions }}</span>
+          <span v-if="detail.locked" class="muted">{{ t('users.lockedUntil') }}</span><span v-if="detail.locked" style="color: var(--danger)">{{ when(detail.locked_until) }}</span>
         </div>
         <div class="toolbar" style="flex-wrap: wrap; gap: .5rem; margin: .75rem 0 0">
-          <button type="button" class="btn secondary" @click="resetPassword"><AppIcon name="key" size="16" />Reset password</button>
-          <button v-if="detail.mfa_method === 'totp'" type="button" class="btn secondary" @click="resetMfa"><AppIcon name="refresh" size="16" />Reset authenticator</button>
-          <button v-if="detail.locked" type="button" class="btn secondary" @click="unlock"><AppIcon name="unlock" size="16" />Unlock</button>
-          <button v-if="detail.active_sessions && !isSelf" type="button" class="btn secondary" @click="signOutAll"><AppIcon name="logout" size="16" />End sessions</button>
-          <button v-if="!isSelf" type="button" class="btn secondary danger" @click="remove"><AppIcon name="trash" size="16" />Delete</button>
+          <button type="button" class="btn secondary" @click="resetPassword"><AppIcon name="key" size="16" />{{ t('users.resetPassword') }}</button>
+          <button v-if="detail.mfa_method === 'totp'" type="button" class="btn secondary" @click="resetMfa"><AppIcon name="refresh" size="16" />{{ t('users.resetMfa') }}</button>
+          <button v-if="detail.locked" type="button" class="btn secondary" @click="unlock"><AppIcon name="unlock" size="16" />{{ t('users.unlock') }}</button>
+          <button v-if="detail.active_sessions && !isSelf" type="button" class="btn secondary" @click="signOutAll"><AppIcon name="logout" size="16" />{{ t('users.endSessions') }}</button>
+          <button v-if="!isSelf" type="button" class="btn secondary danger" @click="remove"><AppIcon name="trash" size="16" />{{ t('common.delete') }}</button>
         </div>
-        <h3 class="section-title">Recent activity</h3>
+        <h3 class="section-title">{{ t('users.activity') }}</h3>
         <ul class="timeline small">
           <li v-for="e in detail.events" :key="e.id">
-            <StatusBadge :value="EVENT_TONE[e.event] === 'danger' ? 'cancelled' : EVENT_TONE[e.event] === 'success' ? 'active' : 'left'" :label="EVENT_LABELS[e.event] ?? e.event" />
+            <StatusBadge :value="EVENT_TONE[e.event] === 'danger' ? 'cancelled' : EVENT_TONE[e.event] === 'success' ? 'active' : 'left'" :label="eventLabel(e.event)" />
             <span class="muted">{{ when(e.created_at) }}{{ e.ip ? ` · ${e.ip}` : '' }}{{ e.detail ? ` · ${e.detail}` : '' }}</span>
           </li>
-          <li v-if="!detail.events.length" class="muted">No activity yet.</li>
+          <li v-if="!detail.events.length" class="muted">{{ t('users.noActivity') }}</li>
         </ul>
       </template>
 
       <template #footer>
-        <button class="btn secondary" @click="form = null">Cancel</button>
-        <button type="submit" form="user-form" class="btn primary" :disabled="saving">{{ saving ? 'Saving…' : form.id ? 'Save' : 'Create account' }}</button>
+        <button class="btn secondary" @click="form = null">{{ t('common.cancel') }}</button>
+        <button type="submit" form="user-form" class="btn primary" :disabled="saving">{{ saving ? t('common.saving') : form.id ? t('common.save') : t('users.createAccount') }}</button>
       </template>
     </SlideOver>
   </section>

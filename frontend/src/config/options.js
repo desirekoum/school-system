@@ -1,9 +1,12 @@
-// Select options shared by forms and detail views (values match the DB enums/checks)
-const opts = (pairs) => pairs.map(([value, label]) => ({ value, label }));
+import { t } from '../i18n';
 
-export const GENDERS = opts([['M', 'Male'], ['F', 'Female']]);
-export const BLOOD_GROUPS = opts(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((g) => [g, g]));
-export const STUDENT_STATUSES = opts([['active', 'Active'], ['graduated', 'Graduated'], ['transferred', 'Transferred'], ['expelled', 'Expelled']]);
-export const TEACHER_STATUSES = opts([['active', 'Active'], ['on_leave', 'On leave'], ['left', 'Left']]);
-export const CONTRACT_TYPES = opts([['permanent', 'Permanent'], ['part_time', 'Part-time'], ['temporary', 'Temporary']]);
-export const RELATIONS = opts([['father', 'Father'], ['mother', 'Mother'], ['guardian', 'Guardian'], ['other', 'Other']]);
+// Select options shared by forms and detail views (values match the DB enums/checks).
+// `label` is a getter: it is translated each time it is read, so the lists follow a language switch.
+export const translated = (group, values) => values.map((value) => ({ value, get label() { return t(`options.${group}.${value}`); } }));
+
+export const GENDERS = translated('gender', ['M', 'F']);
+export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((g) => ({ value: g, label: g }));
+export const STUDENT_STATUSES = translated('studentStatus', ['active', 'graduated', 'transferred', 'expelled']);
+export const TEACHER_STATUSES = translated('teacherStatus', ['active', 'on_leave', 'left']);
+export const CONTRACT_TYPES = translated('contract', ['permanent', 'part_time', 'temporary']);
+export const RELATIONS = translated('relation', ['father', 'mother', 'guardian', 'other']);

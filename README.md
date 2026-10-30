@@ -52,7 +52,13 @@ frontend/src
   components/CrudPage.vue     # config-driven table + form
   views/                      # one view per module
   router/index.js             # lazy-loaded routes
+  i18n/index.js               # vue-i18n setup, FR/EN switch, date/number helpers
+  i18n/locales/<area>.js      # { en, fr } messages, one file per area (keys: t('<area>.<key>'))
 ```
+
+**Languages:** the interface is in French and English (FR | EN switch in the top bar and on the sign-in page).
+The choice is saved in the browser; the first visit follows the browser language. To add a text, add the same key
+to both `en` and `fr` in the matching `i18n/locales` file. API error messages are still in English.
 
 ## Run
 

@@ -1,0 +1,41 @@
+// Dashboard
+export default {
+  en: {
+    title: 'Dashboard', morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening',
+    subtitle: '{date} · {role} · academic year {year}', myTimetable: 'My timetable', takeAttendance: 'Take attendance', takePayment: 'Take a payment',
+    schoolTime: 'school time', classesNow: 'Classes now', rollCalls: 'Roll calls today', absencesToday: 'Absences today', takings: "Today's takings",
+    newThisWeek: 'New this week', examShort: 'Exam T{trimester}·{number}', inDays: 'in {n} day | in {n} days',
+    kAttendanceMine: 'Attendance in my classes (30 d)', kClassesTaught: 'Classes I teach', kGradeSheets: 'Grade sheets to complete', kAbsencesMine: 'Absences in my classes (30 d)',
+    kActive: 'Active students', kRegistered: '{n} registered this year', kAttendance: 'Attendance (30 days)', kAbsences: '{n} absences', pts: ' pts',
+    kCollected: 'Tuition collected', kCollectedOf: '{collected} of {expected} FCFA', kOutstanding: 'Outstanding balance', kReceived30: '{n} FCFA received in the last 30 days',
+    alerts: {
+      attendance: 'roll calls not taken today', attendanceMine: 'of your roll calls were not taken today', overdue: 'students behind on their instalments',
+      plans: 'instalment plans waiting for approval', stock: 'items with {n} or fewer left in stock', registrations: 'registrations awaiting payment',
+    },
+    myClasses: 'My classes today', timetable: 'Timetable', taken: 'Taken', openNow: 'Open now', upcoming: 'Upcoming', notTaken: 'Not taken', take: 'Take',
+    noClass: 'No class for you today.', gradesToEnter: 'Grades to enter', trimesterExam: 'Trimester {trimester}, exam {number}', allComplete: 'All grade sheets are complete.',
+    tuitionPerMonth: 'Tuition received per month', report: 'Report', attendanceMineTitle: 'Attendance in my classes, last 30 days', attendanceTitle: 'Attendance, last 30 days',
+    gradePerClass: 'Average grade per class', gradeHint: '/ 20 · red under 10', toWatch: 'Classes to watch', toWatchHint: 'lowest attendance, 30 days',
+    mostAbsent: 'Most absent students', days30: '30 days', absences: '{n} absence | {n} absences', nothingToday: 'Nothing received yet today.',
+    sale: 'Sale', tuition: 'Tuition', largestBalances: 'Largest balances due', accounts: 'Accounts', recentRegistrations: 'Recent registrations', fillRate: 'Class fill rate',
+  },
+  fr: {
+    title: 'Tableau de bord', morning: 'Bonjour', afternoon: 'Bon après-midi', evening: 'Bonsoir',
+    subtitle: '{date} · {role} · année scolaire {year}', myTimetable: 'Mon emploi du temps', takeAttendance: 'Faire l’appel', takePayment: 'Encaisser un paiement',
+    schoolTime: 'heure de l’école', classesNow: 'Cours en ce moment', rollCalls: 'Appels du jour', absencesToday: 'Absences du jour', takings: 'Recettes du jour',
+    newThisWeek: 'Nouvelles cette semaine', examShort: 'Éval. T{trimester}·{number}', inDays: 'dans {n} jour | dans {n} jours',
+    kAttendanceMine: 'Présence dans mes classes (30 j)', kClassesTaught: 'Classes où j’enseigne', kGradeSheets: 'Feuilles de notes à compléter', kAbsencesMine: 'Absences dans mes classes (30 j)',
+    kActive: 'Élèves actifs', kRegistered: '{n} inscrits cette année', kAttendance: 'Présence (30 jours)', kAbsences: '{n} absences', pts: ' pts',
+    kCollected: 'Scolarité encaissée', kCollectedOf: '{collected} sur {expected} FCFA', kOutstanding: 'Reste à recouvrer', kReceived30: '{n} FCFA reçus ces 30 derniers jours',
+    alerts: {
+      attendance: 'appels non faits aujourd’hui', attendanceMine: 'de vos appels n’ont pas été faits aujourd’hui', overdue: 'élèves en retard sur leurs versements',
+      plans: 'échéanciers en attente d’approbation', stock: 'articles avec {n} unités ou moins en stock', registrations: 'inscriptions en attente de paiement',
+    },
+    myClasses: 'Mes cours du jour', timetable: 'Emploi du temps', taken: 'Fait', openNow: 'Ouvert', upcoming: 'À venir', notTaken: 'Non fait', take: 'Faire l’appel',
+    noClass: 'Pas de cours pour vous aujourd’hui.', gradesToEnter: 'Notes à saisir', trimesterExam: 'Trimestre {trimester}, évaluation {number}', allComplete: 'Toutes les feuilles de notes sont complètes.',
+    tuitionPerMonth: 'Scolarité encaissée par mois', report: 'Rapport', attendanceMineTitle: 'Présence dans mes classes, 30 derniers jours', attendanceTitle: 'Présence, 30 derniers jours',
+    gradePerClass: 'Moyenne par classe', gradeHint: '/ 20 · rouge sous 10', toWatch: 'Classes à surveiller', toWatchHint: 'présence la plus basse, 30 jours',
+    mostAbsent: 'Élèves les plus absents', days30: '30 jours', absences: '{n} absence | {n} absences', nothingToday: 'Rien encaissé aujourd’hui.',
+    sale: 'Vente', tuition: 'Scolarité', largestBalances: 'Plus gros restes à payer', accounts: 'Comptes', recentRegistrations: 'Inscriptions récentes', fillRate: 'Taux de remplissage',
+  },
+};

@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, onBeforeUnmount } from 'vue';
 import AppIcon from './AppIcon.vue';
+import { t } from '../i18n';
 
 // Side panel for forms. <Teleport> renders it under <body> so it overlays the whole layout.
 defineProps({ title: String });
@@ -17,7 +18,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
       <aside class="slide-over" role="dialog" :aria-label="title">
         <header>
           <h2>{{ title }}</h2>
-          <button class="icon-btn" aria-label="Close" @click="emit('close')"><AppIcon name="x" /></button>
+          <button class="icon-btn" :aria-label="t('common.close')" @click="emit('close')"><AppIcon name="x" /></button>
         </header>
         <div class="slide-body"><slot /></div>
         <footer><slot name="footer" /></footer>
