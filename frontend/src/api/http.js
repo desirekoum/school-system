@@ -125,3 +125,20 @@ export const importApi = {
   run: (entity, file, dryRun) =>
     http.post(`/import/${entity}`, file, { params: { dry_run: dryRun ? 1 : undefined }, headers: { 'Content-Type': XLSX_TYPE } }).then((r) => r.data),
 };
+
+export const timetableApi = {
+  list: (params) => http.get('/timetable', { params }).then((r) => r.data),   // { class_id } | { teacher_id, academic_year } | { mine: 1 }
+  now: (params) => http.get('/timetable/now', { params }).then((r) => r.data),
+  create: (data) => http.post('/timetable', data).then((r) => r.data),
+  update: (id, data) => http.put(`/timetable/${id}`, data).then((r) => r.data),
+  remove: (id) => http.delete(`/timetable/${id}`),
+};
+
+export const attendanceApi = {
+  day: (params) => http.get('/attendance/day', { params }).then((r) => r.data),
+  sheet: (slotId, date) => http.get(`/attendance/slots/${slotId}/${date}`).then((r) => r.data),
+  save: (slotId, date, records) => http.put(`/attendance/slots/${slotId}/${date}`, { records }).then((r) => r.data),
+  report: (params) => http.get('/attendance/report', { params }).then((r) => r.data),
+  register: (params) => http.get('/attendance/register', { params }).then((r) => r.data),
+  student: (id, params) => http.get(`/attendance/students/${id}`, { params }).then((r) => r.data),
+};

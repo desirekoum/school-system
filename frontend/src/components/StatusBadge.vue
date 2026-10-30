@@ -8,6 +8,8 @@ const TONES = {
   // finances
   paid: 'success', approved: 'success', partial: 'warning', requested: 'info',
   unpaid: 'danger', overdue: 'danger', rejected: 'danger', voided: 'neutral', upcoming: 'neutral',
+  // attendance
+  present: 'success', absent: 'danger', late: 'warning', excused: 'info', open: 'info', taken: 'success', missed: 'danger', closed: 'neutral',
   // booleans (e.g. item on sale / withdrawn)
   true: 'success', false: 'neutral',
 };

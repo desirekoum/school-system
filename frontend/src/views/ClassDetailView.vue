@@ -82,7 +82,10 @@ async function unassign(courseId) {
 
 <template>
   <section v-if="cls">
-    <PageHeader :title="cls.name" :subtitle="`${cls.level} · ${cls.academic_year}`" :back="{ to: '/classes', label: 'Classes' }" />
+    <PageHeader :title="cls.name" :subtitle="`${cls.level} · ${cls.academic_year}`" :back="{ to: '/classes', label: 'Classes' }">
+      <RouterLink :to="{ path: '/timetable', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="grid" />Timetable</RouterLink>
+      <RouterLink v-if="can(['attendance:read', 'attendance:take'])" :to="{ path: '/attendance/reports', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="userCheck" />Attendance</RouterLink>
+    </PageHeader>
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
 
     <nav class="tabs-bar">

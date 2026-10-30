@@ -16,7 +16,8 @@ export function useAuth() {
     return loading;
   };
   const setUser = (u) => { user.value = u; loading = Promise.resolve(u); };
-  const can = (perm) => !!user.value?.permissions.includes(perm);
+  // An array means "any of these" (e.g. attendance: teachers take it, the office reads it)
+  const can = (perm) => [].concat(perm).some((p) => !!user.value?.permissions.includes(p));
   async function logout() {
     try { await authApi.logout(); } finally { setUser(null); }
   }

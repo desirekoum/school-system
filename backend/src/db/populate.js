@@ -206,7 +206,7 @@ async function populate() {
     await client.query('BEGIN');
     if (RESET) {
       // RESTART IDENTITY resets SERIAL counters; CASCADE empties dependent tables too
-      await client.query(`TRUNCATE auth_events, sessions, auth_challenges, users, sale_items, sales, expenses, items, payments, instalments, instalment_plans, grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
+      await client.query(`TRUNCATE attendance_records, attendance_sessions, timetable_slots, auth_events, sessions, auth_challenges, users, sale_items, sales, expenses, items, payments, instalments, instalment_plans, grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
                           classes, academic_years, courses, students, teachers RESTART IDENTITY CASCADE`);
     }
 
@@ -617,6 +617,68 @@ async function populate() {
 
     // --- Demo accounts: one per role. Codes are printed in the API console until SMTP/SMS are configured ---
     const DEMO_PASSWORD = 'SchoolDoc2026';
+    // --- Timetable: each course's weekly hours placed in free periods, without double-booking a class or a teacher ---
+    const PERIODS = [['07:30', '08:25'], ['08:25', '09:20'], ['09:20', '10:15'], ['10:30', '11:25'], ['11:25', '12:20'], ['13:30', '14:25'], ['14:25', '15:20']];
+    const periodsOf = (day) => (day === 6 ? PERIODS.slice(0, 4) : PERIODS);   // Saturday: mornings only
+    const busy = new Set();   // "class:12:3:4" / "teacher:7:3:4" = taken on day 3, period 4
+    const slotRows = [];
+    for (const cls of classes) {
+      const courses = ccRows.filter((cc) => cc.class_id === cls.id)
+        .map((cc) => ({ ...cc, hours: COURSES[courseIds.indexOf(cc.course_id)][3] }))
+        .sort((a, b) => b.hours - a.hours);
+      for (const cc of courses) {
+        const days = [1, 2, 3, 4, 5, 6].sort(() => rand() - 0.5);
+        for (let h = 0; h < cc.hours; h++) {
+          // Spread a course over the week: a new day per hour while possible
+          const order = [...days.slice(h % 6), ...days.slice(0, h % 6)];
+          let placed = false;
+          for (const day of order) {
+            for (const [pi, [start, end]] of periodsOf(day).entries()) {
+              const keys = [`class:${cls.id}:${day}:${pi}`, cc.teacher_id ? `teacher:${cc.teacher_id}:${day}:${pi}` : null].filter(Boolean);
+              if (keys.some((k) => busy.has(k))) continue;
+              keys.forEach((k) => busy.add(k));
+              slotRows.push({ class_id: cls.id, course_id: cc.course_id, weekday: day, start_time: start, end_time: end, room: `Salle ${cls.id}` });
+              placed = true;
+              break;
+            }
+            if (placed) break;
+          }
+        }
+      }
+    }
+    const slots = await insertMany(client, 'timetable_slots', slotRows, 'id, class_id, course_id, weekday, start_time, end_time');
+
+    // --- Attendance of the last two weeks of classes (today's classes are left for the teachers to take) ---
+    const nowIso = new Date().toISOString().slice(0, 10);
+    const { rows: [yearRange] } = await client.query('SELECT start_date FROM academic_years WHERE name = $1', [ACADEMIC_YEAR]);
+    const rosterOf = {};
+    regRows.forEach((r) => { if (r.status !== 'cancelled') (rosterOf[r.class_id] ??= []).push(r.student_id); });
+    const teacherOf = Object.fromEntries(ccRows.map((cc) => [`${cc.class_id}:${cc.course_id}`, cc.teacher_id]));
+    // Some students miss school more often than others
+    const absentee = Object.fromEntries(studentIds.map((id) => [id, chance(0.1) ? 4 : 1]));
+    let sessionCount = 0, recordCount = 0;
+    for (let back = 14; back >= 1; back--) {
+      const date = new Date(Date.parse(nowIso) - back * 86400000).toISOString().slice(0, 10);
+      const weekday = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
+      if (weekday === 7 || date < yearRange.start_date) continue;
+      const daySlots = slots.filter((sl) => sl.weekday === weekday);
+      const sessions = await insertMany(client, 'attendance_sessions', daySlots.map((sl) => ({
+        slot_id: sl.id, class_id: sl.class_id, course_id: sl.course_id, teacher_id: teacherOf[`${sl.class_id}:${sl.course_id}`],
+        date, start_time: sl.start_time, end_time: sl.end_time,
+      })), 'id, class_id');
+      const ids = [], students = [], statuses = [], lates = [];
+      for (const se of sessions) {
+        for (const sid of rosterOf[se.class_id] ?? []) {
+          const k = absentee[sid];
+          const st = weighted([['present', 100 - 7 * k], ['absent', 4 * k], ['late', 2 * k], ['excused', k]]);
+          ids.push(se.id); students.push(sid); statuses.push(st); lates.push(st === 'late' ? int(5, 25) : null);
+        }
+      }
+      await client.query(`INSERT INTO attendance_records (session_id, student_id, status, minutes_late)
+        SELECT * FROM unnest($1::int[], $2::int[], $3::attendance_status[], $4::smallint[])`, [ids, students, statuses, lates]);
+      sessionCount += sessions.length; recordCount += ids.length;
+    }
+
     const hash = await hashPassword(DEMO_PASSWORD);
     const teacher = teachers.find((t) => ccRows.some((cc) => cc.teacher_id === t.id));
     const { rows: [tRow] } = await client.query('SELECT first_name, last_name, email FROM teachers WHERE id = $1', [teacher.id]);
@@ -635,7 +697,8 @@ async function populate() {
     for (const u of userRows) console.log(`  ${u.username.padEnd(10)} ${u.role.padEnd(10)} ${u.mfa_method}`);
     console.log(`\nDone: ${teacherRows.length} teachers, ${courseRows.length} courses, ${classes.length} classes, ` +
       `${studentRows.length + formerRows.length} students, ${guardianRows.length} guardians, ${regRows.length} registrations, ${gradeRows.length} grades, ` +
-      `${planIds.length} instalment plans, ${payRows.length} payments, ${itemRows.length} items, ${saleRows.length} sales, ${expRows.length} expenses.`);
+      `${planIds.length} instalment plans, ${payRows.length} payments, ${itemRows.length} items, ${saleRows.length} sales, ${expRows.length} expenses, ` +
+      `${slots.length} timetable slots, ${sessionCount} attendance sessions (${recordCount} marks).`);
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

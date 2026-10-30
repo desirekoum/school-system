@@ -29,6 +29,12 @@ const ACCESS = [
   ['GET', /^\/(classes|courses|academic-years)(\/|$)/, 'academics:read'],
   ['WRITE', /^\/(classes|courses|academic-years)(\/|$)/, 'academics:write'],
 
+  ['GET', /^\/timetable(\/|$)/, 'academics:read'],
+  ['WRITE', /^\/timetable(\/|$)/, 'academics:write'],
+  // Several permissions = any of them; the attendance service then narrows a teacher to their own classes
+  ['GET', /^\/attendance(\/|$)/, ['attendance:read', 'attendance:take']],
+  ['WRITE', /^\/attendance(\/|$)/, ['attendance:manage', 'attendance:take']],
+
   ['GET', /^\/registrations(\/|$)/, 'registrations:read'],
   ['WRITE', /^\/registrations(\/|$)/, 'registrations:write'],
 
@@ -74,8 +80,9 @@ export function requireAuth(req, res, next) {
 /** 401 = who are you? (not signed in) · 403 = I know you, but you may not. */
 export function authorize(req, res, next) {
   const perm = requiredPermission(req.method, req.path);
-  if (req.user.role === 'admin' || (perm && can(req.user, perm))) return next();
-  throw new HttpError(403, perm ? `Your role cannot do this (needs ${perm})` : 'Access denied');
+  const perms = perm ? [].concat(perm) : [];
+  if (req.user.role === 'admin' || perms.some((p) => can(req.user, p))) return next();
+  throw new HttpError(403, perm ? `Your role cannot do this (needs ${perms.join(' or ')})` : 'Access denied');
 }
 
 export const requirePermission = (perm) => (req, res, next) => {

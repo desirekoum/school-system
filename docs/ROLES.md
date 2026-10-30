@@ -8,11 +8,11 @@ The five other roles cover the school's main jobs:
 | Role | Who | Can | Cannot |
 |---|---|---|---|
 | **System administrator** (`admin`) | IT / head of administration | Everything, including creating users and assigning roles | — |
-| **Principal** (`principal`) | Head of school, deputy | Read every module; manage academic years, classes, courses and assignments; approve or reject instalment plans; financial reports | Record or void money, edit students, enter grades |
-| **Registrar** (`registrar`) | Admissions / school office | Create and edit students and guardians; register students; request instalment plans; read tuition accounts, grades, teachers | Take payments, approve plans, see expenses or reports |
+| **Principal** (`principal`) | Head of school, deputy | Read every module; manage academic years, classes, courses, assignments and **timetables**; approve or reject instalment plans; financial and **attendance** reports; correct attendance | Record or void money, edit students, enter grades |
+| **Registrar** (`registrar`) | Admissions / school office | Create and edit students and guardians; register students; request instalment plans; read tuition accounts, grades, teachers; **attendance** reports and corrections | Take payments, approve plans, see expenses or reports |
 | **Bursar** (`bursar`) | Finance manager | Payments, voids, plans (request and approve), item catalog and stock, sales, expenses, financial reports | Edit students, registrations or academics; see salaries |
 | **Cashier** (`cashier`) | Front desk | Record tuition payments and sales; read accounts and the catalog | Void anything, see expenses or reports, approve plans |
-| **Teacher** (`teacher`) | Teaching staff | Read students, classes and results; enter grades **only for the courses assigned to them** | Anything financial, registrations, staff data |
+| **Teacher** (`teacher`) | Teaching staff | Read students, classes, timetables and results; enter grades and **take attendance only for their own courses** (attendance only while the class happens); attendance reports of the classes they teach | Anything financial, registrations, staff data |
 
 The full permission matrix is in the app (Users & roles → Roles & permissions) and in
 `backend/src/modules/auth/roles.js`. Roles live in code, not in the database, so every change is reviewed.
@@ -21,6 +21,10 @@ How it is enforced:
 - **Server side, on every request.** `middleware/auth.js` has one access table (method + path → permission).
   A request that matches no rule is refused: *deny by default*. A teacher's grade entry is also checked row by row
   (`class_courses.teacher_id`).
+- **Attendance**: a teacher takes the roll call of their own timetable slots, from 15 minutes before the start to
+  60 minutes after the end (school time, `SCHOOL_TZ`, default `Africa/Douala`). After that, only `attendance:manage`
+  (principal, registrar) can record or correct it. Reports: `attendance:read` sees the whole school; a teacher only the
+  classes where they teach a course or are homeroom teacher.
 - **Client side, for comfort only.** The menu, pages and buttons a role can't use are hidden (`useAuth().can()`).
   Hiding is not security: the API refuses anyway.
 - Payments, sales and expenses record the signed-in user's name (`received_by`), not a value typed in the form.
