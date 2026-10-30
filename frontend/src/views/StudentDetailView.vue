@@ -9,6 +9,7 @@ import Avatar from '../components/Avatar.vue';
 import AppIcon from '../components/AppIcon.vue';
 import ReportCard from '../components/ReportCard.vue';
 import StudentTuition from '../components/StudentTuition.vue';
+import StudentAttendance from '../components/StudentAttendance.vue';
 import { useAuth } from '../composables/useAuth';
 
 const props = defineProps({ id: String });
@@ -96,6 +97,8 @@ async function removeGuardian(g) {
     </div>
 
     <StudentTuition v-if="can('finance:read')" :student-id="id" />
+
+    <StudentAttendance v-if="can(['attendance:read', 'attendance:take'])" :student-id="id" />
 
     <ReportCard v-if="can('grades:read')" :student-id="id" />
 

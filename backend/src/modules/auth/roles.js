@@ -28,6 +28,9 @@ export const PERMISSIONS = {
   'expenses:write': 'Record expenses and purchases',
   'expenses:void': 'Void expenses',
   'reports:read': 'View financial reports',
+  'attendance:take': 'Take attendance during their own classes (teachers)',
+  'attendance:read': 'View attendance reports for the whole school',
+  'attendance:manage': 'Record or correct the attendance of any class and date',
   'users:manage': 'Manage user accounts and roles',
 };
 
@@ -39,15 +42,16 @@ export const ROLES = {
   },
   principal: {
     label: 'Principal',
-    description: 'Runs the school: oversees academics, approves instalment plans, reads all reports.',
+    description: 'Runs the school: oversees academics and timetables, approves instalment plans, reads all reports.',
     permissions: ['students:read', 'staff:read', 'academics:read', 'academics:write', 'registrations:read',
-      'grades:read', 'finance:read', 'plans:approve', 'items:read', 'sales:read', 'expenses:read', 'reports:read'],
+      'grades:read', 'finance:read', 'plans:approve', 'items:read', 'sales:read', 'expenses:read', 'reports:read',
+      'attendance:read', 'attendance:manage'],
   },
   registrar: {
     label: 'Registrar',
-    description: 'Admissions office: student records, guardians and registrations.',
+    description: 'Admissions and school life: student records, guardians, registrations and attendance.',
     permissions: ['students:read', 'students:write', 'staff:read', 'academics:read', 'registrations:read',
-      'registrations:write', 'grades:read', 'finance:read', 'plans:request'],
+      'registrations:write', 'grades:read', 'finance:read', 'plans:request', 'attendance:read', 'attendance:manage'],
   },
   bursar: {
     label: 'Bursar',
@@ -64,8 +68,8 @@ export const ROLES = {
   },
   teacher: {
     label: 'Teacher',
-    description: 'Enters grades for the courses they teach; reads classes and results.',
-    permissions: ['students:read', 'academics:read', 'grades:read', 'grades:write'],
+    description: 'Enters grades and takes attendance for the courses they teach; reads classes, results and their attendance reports.',
+    permissions: ['students:read', 'academics:read', 'grades:read', 'grades:write', 'attendance:take'],
   },
 };
 

@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuth } from '../composables/useAuth';
 
+const ATTENDANCE = ['attendance:take', 'attendance:read', 'attendance:manage'];
+
 // Lazy-loaded routes: each view is split into its own JS chunk.
 // meta.perm: permission needed to open the page (the API checks it again on every call).
 const routes = [
@@ -22,6 +24,10 @@ const routes = [
   { path: '/finances/expenses', component: () => import('../views/ExpensesView.vue'), meta: { perm: 'expenses:read' } },
   { path: '/finances/reports', component: () => import('../views/FinanceReportView.vue'), meta: { perm: 'reports:read' } },
   { path: '/finances/receipts/:id', component: () => import('../views/ReceiptView.vue'), props: true, meta: { perm: 'finance:read' } },
+  { path: '/timetable', component: () => import('../views/TimetableView.vue'), meta: { perm: 'academics:read' } },
+  { path: '/attendance', component: () => import('../views/AttendanceView.vue'), meta: { perm: ATTENDANCE } },
+  { path: '/attendance/reports', component: () => import('../views/AttendanceReportView.vue'), meta: { perm: ['attendance:read', 'attendance:take'] } },
+  { path: '/attendance/:slotId/:date', component: () => import('../views/AttendanceSheetView.vue'), props: true, meta: { perm: ATTENDANCE } },
   { path: '/courses', component: () => import('../views/CoursesView.vue'), meta: { perm: 'academics:read' } },
   { path: '/users', component: () => import('../views/UsersView.vue'), meta: { perm: 'users:manage' } },
   { path: '/forbidden', component: () => import('../views/ForbiddenView.vue') },

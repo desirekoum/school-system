@@ -18,6 +18,9 @@ const nav = [
     { to: '/registrations', perm: 'registrations:read', label: 'Registrations', icon: 'registrations' },
     { to: '/classes', perm: 'academics:read', label: 'Classes', icon: 'classes' },
     { to: '/courses', perm: 'academics:read', label: 'Courses', icon: 'courses' },
+    { to: '/timetable', perm: 'academics:read', label: 'Timetable', icon: 'grid' },
+    { to: '/attendance', perm: ['attendance:take', 'attendance:read', 'attendance:manage'], label: 'Attendance', icon: 'userCheck', exact: true },
+    { to: '/attendance/reports', perm: ['attendance:read', 'attendance:take'], label: 'Attendance reports', icon: 'chart' },
   ] },
   { group: 'Finances', items: [
     { to: '/finances', perm: 'finance:read', label: 'Tuition & accounts', icon: 'wallet', exact: true },

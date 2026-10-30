@@ -14,6 +14,8 @@ import { items, sales, expenses } from './modules/store/store.routes.js';
 import auth from './modules/auth/auth.routes.js';
 import users from './modules/users/users.routes.js';
 import imports from './modules/import/import.routes.js';
+import timetable from './modules/timetable/timetable.routes.js';
+import attendance from './modules/attendance/attendance.routes.js';
 import { errorHandler } from './middleware/errors.js';
 import { loadUser, requireAuth, authorize, checkOrigin, requireHttps } from './middleware/auth.js';
 
@@ -53,6 +55,8 @@ app.use('/api/items', items);
 app.use('/api/sales', sales);
 app.use('/api/expenses', expenses);
 app.use('/api/import', imports);
+app.use('/api/timetable', timetable);
+app.use('/api/attendance', attendance);
 
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 // Express 5 forwards rejected async handlers here automatically
