@@ -84,7 +84,10 @@ export const checkOrigin = (allowed) => (req, res, next) => {
   if (READS.includes(req.method) || req.method === 'OPTIONS') return next();
   const origin = req.get('origin');
   if (req.get('sec-fetch-site') === 'cross-site' || (origin && !allowed.includes(origin))) {
-    throw new HttpError(403, 'Cross-site request refused');
+    // Most often a configuration mismatch: say which address came in and which ones are allowed
+    const hint = `request from ${origin ?? 'another site'}, allowed: ${allowed.join(', ')} (CORS_ORIGIN in backend/.env)`;
+    console.warn(`[origin] refused ${req.method} ${req.originalUrl}: ${hint}`);
+    throw new HttpError(403, process.env.NODE_ENV === 'production' ? 'Cross-site request refused' : `Cross-site request refused: ${hint}`);
   }
   next();
 };
