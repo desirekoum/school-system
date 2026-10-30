@@ -8,7 +8,8 @@ import PaginationBar from '../components/PaginationBar.vue';
 import { expensesApi, itemsApi, academicYearsApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { money, METHODS, methodLabel, EXPENSE_CATEGORIES, shortCategory, today } from '../config/finance';
-import { downloadCsv } from '../utils/csv';
+import { exportRows } from '../utils/xlsx';
+import ExportMenu from '../components/ExportMenu.vue';
 import { useAuth } from '../composables/useAuth';
 
 const { can } = useAuth();
@@ -66,9 +67,9 @@ const voidExpense = async (e) => {
   }
 };
 
-async function exportCsv() {
+async function exportList(format) {
   const all = await expensesApi.list({ ...filters, search: search.value || undefined });
-  downloadCsv(`expenses-${filters.from || 'all'}-${filters.to || 'all'}.csv`, all, [
+  await exportRows(format, `expenses-${filters.from || 'all'}-${filters.to || 'all'}`, all, [
     ['voucher_number', 'Voucher'], ['spent_at', 'Date'], ['category', 'Category', shortCategory], ['description', 'Description'],
     ['supplier', 'Supplier'], ['quantity', 'Qty'], ['unit_price', 'Unit price (FCFA)'], ['amount', 'Amount (FCFA)'],
     ['method', 'Method', methodLabel], ['reference', 'Reference'], ['approved_by', 'Approved by'], ['voided', 'Voided']]);
@@ -78,7 +79,7 @@ async function exportCsv() {
 <template>
   <section>
     <PageHeader title="Expenses" subtitle="What the school spends: purchases for the year, stock for the shop, running costs.">
-      <button class="btn secondary" @click="exportCsv"><AppIcon name="download" />Export CSV</button>
+      <ExportMenu @export="exportList" />
       <button v-if="can('expenses:write')" class="btn primary" @click="openForm"><AppIcon name="plus" />New expense</button>
     </PageHeader>
 

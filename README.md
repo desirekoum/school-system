@@ -123,9 +123,15 @@ Every endpoint except `/api/health` and `/api/auth/*` needs a session cookie and
 | `/api/items` | CRUD (filters `category`, `is_active`; includes `sold`). Deleting an item with sales or purchases is refused: deactivate it instead |
 | `/api/sales` | `GET ?from&to&method&academic_year&student_id&voided` (+ `sum`), `GET /:id` (receipt with lines), `POST {student_id \| buyer_name, lines: [{item_id, quantity}], method, reference, sold_at}`, `POST /:id/void {reason}` |
 | `/api/expenses` | `GET ?from&to&category&method&academic_year&voided` (+ `sum`), `GET /:id`, `POST {category, description, item_id?, quantity, unit_price, supplier, spent_at, method, reference}`, `POST /:id/void {reason}` |
+| `/api/import/:entity` | `GET /template` (.xlsx to fill), `POST ?dry_run=1` (body = the .xlsx file: checks every row, saves nothing), `POST` (saves all rows, or none if one row has an error). Entities: `students`, `guardians`, `teachers`, `courses`, `classes`, `class-courses`, `items`, `registrations` |
 | `/api/registrations` `POST` | also accepts `payment: {amount, method, reference}` and `plan: {instalments}`, both saved in the same transaction |
 
 **Pagination** — every list endpoint accepts `?page=1&pageSize=50` (default 50, max 100) and returns
 `{ data, total, page, pageSize, totalPages }` (registrations also return per-status `counts`).
 Lists also take `?search=` and exact filters (e.g. `?status=active`). Without `page`, the full array is
 returned, which the dropdowns use.
+
+**Excel import / export** — list pages export to Excel (.xlsx) or CSV. The export headers are the ones the import reads,
+so a list can be exported, edited in Excel and imported back: records are matched by their natural key (matricule,
+email, code, class name + year) and updated, the others are created. Empty cells leave existing values unchanged.
+French headers (Nom, Prénom, Sexe, Date de naissance…) and values (Masculin, Père, CDI…) are recognised.

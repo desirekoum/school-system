@@ -41,7 +41,8 @@ const fields = computed(() => [
 
 <template>
   <CrudPage title="Classes" singular="class" subtitle="Classes per academic year, homeroom teachers and enrollment."
-            :api="classesApi" :readonly="!can('academics:write')" :fields="fields">
+            :api="classesApi" :readonly="!can('academics:write')" :fields="fields"
+            :imports="[{ entity: 'classes', label: 'Classes' }, { entity: 'class-courses', label: 'Courses taught per class (and their teacher)' }]" export-name="classes">
     <template #actions="{ row }">
       <RouterLink :to="`/classes/${row.id}`" class="icon-btn" title="Open"><AppIcon name="chevronRight" size="16" /></RouterLink>
     </template>

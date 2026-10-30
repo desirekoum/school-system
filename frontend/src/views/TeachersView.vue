@@ -34,5 +34,6 @@ const { can } = useAuth();
 
 <template>
   <CrudPage title="Teachers" singular="teacher" subtitle="Teaching staff, contracts and pay details."
-            :api="teachersApi" :readonly="!can('staff:write')" :fields="fields" :identity="identity" />
+            :api="teachersApi" :readonly="!can('staff:write')" :fields="fields"
+            :imports="[{ entity: 'teachers', label: 'Teachers' }]" export-name="teachers" :identity="identity" />
 </template>

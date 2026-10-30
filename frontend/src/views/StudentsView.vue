@@ -41,7 +41,8 @@ const { can } = useAuth();
 
 <template>
   <CrudPage title="Students" singular="student" subtitle="Student records, contacts and health information."
-            :api="studentsApi" :readonly="!can('students:write')" :fields="fields" :identity="identity" :row-link="(s) => `/students/${s.id}`">
+            :api="studentsApi" :readonly="!can('students:write')" :fields="fields"
+            :imports="[{ entity: 'students', label: 'Students' }, { entity: 'guardians', label: 'Parents / guardians (linked by matricule)' }]" export-name="students" :identity="identity" :row-link="(s) => `/students/${s.id}`">
     <template #actions="{ row }">
       <RouterLink :to="`/students/${row.id}`" class="icon-btn" title="Open"><AppIcon name="chevronRight" size="16" /></RouterLink>
     </template>

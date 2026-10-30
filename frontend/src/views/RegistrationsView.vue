@@ -9,6 +9,9 @@ import { registrationsApi, studentsApi, classesApi } from '../api/http';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import PaginationBar from '../components/PaginationBar.vue';
 import AccountPanel from '../components/AccountPanel.vue';
+import ExportMenu from '../components/ExportMenu.vue';
+import ImportDialog from '../components/ImportDialog.vue';
+import { exportRows } from '../utils/xlsx';
 import { money, METHODS, schedule, today } from '../config/finance';
 import { useAuth } from '../composables/useAuth';
 
@@ -79,13 +82,35 @@ async function register() {
 }
 const setStatus = (r, status) => wrap(() => registrationsApi.setStatus(r.id, status));
 const remove = (r) => confirm('Delete this registration?') && wrap(() => registrationsApi.remove(r.id));
+
+// Whole filtered list; "Matricule", "Class" and "Academic year" are the columns the import reads back
+const importing = ref(false);
+const num = (v) => (v == null ? null : Number(v));
+const exporting = ref(false);
+async function exportList(format) {
+  exporting.value = true;
+  try {
+    const rows = await registrationsApi.list({ search: search.value || undefined, ...filters });
+    await exportRows(format, `registrations${filters.status ? `-${filters.status}` : ''}`, rows, [
+      ['matricule', 'Matricule'], ['student', 'Student'], ['class_name', 'Class'], ['academic_year', 'Academic year'],
+      ['registered_at', 'Date'], ['tuition_fee', 'Tuition (FCFA)', num], ['paid', 'Paid (FCFA)', num], ['balance', 'Balance (FCFA)', num],
+      ['status', 'Status', (v) => (v === 'pending' ? 'Awaiting payment' : TAB_LABELS[v] ?? v)]]);
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    exporting.value = false;
+  }
+}
 </script>
 
 <template>
   <section>
     <PageHeader title="Registrations" subtitle="Enroll students in classes. A registration is complete once the tuition is paid.">
+      <ExportMenu :busy="exporting" @export="exportList" />
+      <button v-if="can('registrations:write')" class="btn secondary" @click="importing = true"><AppIcon name="upload" />Import</button>
       <button v-if="can('registrations:write')" class="btn primary" @click="openForm"><AppIcon name="plus" />New registration</button>
     </PageHeader>
+    <ImportDialog v-if="importing" :imports="[{ entity: 'registrations', label: 'Registrations' }]" @close="importing = false" @done="load" />
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
 
