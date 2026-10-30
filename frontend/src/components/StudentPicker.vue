@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 import Avatar from './Avatar.vue';
 import { studentsApi } from '../api/http';
+import { t } from '../i18n';
 
 /** Search-as-you-type student field (server-side search, 8 results). v-model = selected student or null. */
 const model = defineModel({ type: Object, default: null });
@@ -34,8 +35,8 @@ function clear() {
 
 <template>
   <div class="picker">
-    <input v-model="text" type="search" placeholder="Type a name or matricule…" :readonly="!!model" @focus="open = results.length > 0" @blur="close" />
-    <button v-if="model" type="button" class="picker-clear" aria-label="Change student" @click="clear">×</button>
+    <input v-model="text" type="search" :placeholder="t('students.pickerHint')" :readonly="!!model" @focus="open = results.length > 0" @blur="close" />
+    <button v-if="model" type="button" class="picker-clear" :aria-label="t('students.changeStudent')" @click="clear">×</button>
     <ul v-if="open && results.length" class="picker-list">
       <li v-for="s in results" :key="s.id" @mousedown.prevent="choose(s)">
         <Avatar :name="`${s.first_name} ${s.last_name}`" :src="s.photo_url" :size="26" />

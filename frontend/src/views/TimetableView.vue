@@ -7,6 +7,7 @@ import AppIcon from '../components/AppIcon.vue';
 import { timetableApi, classesApi, teachersApi, academicYearsApi } from '../api/http';
 import { useAuth } from '../composables/useAuth';
 import { WEEKDAYS, dayName, toMinutes } from '../config/attendance';
+import { t } from '../i18n';
 
 /**
  * Weekly timetable of a class (a class belongs to one academic year), or of a teacher.
@@ -36,12 +37,12 @@ const yearClasses = computed(() => classes.value.filter((c) => c.academic_year =
 const selectedClass = computed(() => classes.value.find((c) => c.id === classId.value));
 
 onMounted(async () => {
-  const [y, c, t] = await Promise.all([
+  const [y, c, tc] = await Promise.all([
     academicYearsApi.list(), classesApi.list(), can('staff:read') ? teachersApi.list({ status: 'active' }) : [],
   ]);
   years.value = y;
   classes.value = c;
-  teachers.value = t;
+  teachers.value = tc;
   year.value = classes.value.find((x) => x.id === classId.value)?.academic_year ?? y.find((x) => x.is_current)?.name ?? y[0]?.name ?? '';
   if (mode.value === 'class' && !classId.value) classId.value = yearClasses.value[0]?.id ?? '';
   await Promise.all([load(), refreshNow()]);
@@ -157,7 +158,7 @@ async function save() {
   }
 }
 async function remove() {
-  if (!confirm('Delete this slot from the timetable? Attendance already taken is kept.')) return;
+  if (!confirm(t('timetable.confirmDelete'))) return;
   try {
     await timetableApi.remove(form.value.id);
     form.value = null;
@@ -170,8 +171,8 @@ async function remove() {
 
 <template>
   <section>
-    <PageHeader title="Timetable" subtitle="Weekly schedule of each class for an academic year, and what is being taught right now.">
-      <button v-if="editable && mode === 'class' && classId" class="btn primary" @click="openSlot(null, mobileDay)"><AppIcon name="plus" />Add a slot</button>
+    <PageHeader :title="t('timetable.title')" :subtitle="t('timetable.subtitle')">
+      <button v-if="editable && mode === 'class' && classId" class="btn primary" @click="openSlot(null, mobileDay)"><AppIcon name="plus" />{{ t('timetable.addSlot') }}</button>
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
@@ -180,10 +181,10 @@ async function remove() {
     <div v-if="now" class="card now-card">
       <div class="now-head">
         <span class="live-dot" aria-hidden="true" />
-        <b>Now</b>
-        <span class="muted small">{{ dayName(now.weekday) }} {{ now.time }} · school time</span>
+        <b>{{ t('timetable.now') }}</b>
+        <span class="muted small">{{ t('timetable.schoolTime', { day: dayName(now.weekday), time: now.time }) }}</span>
       </div>
-      <p v-if="!now.slots.length" class="muted small">No class is scheduled at this time.</p>
+      <p v-if="!now.slots.length" class="muted small">{{ t('timetable.noneNow') }}</p>
       <div v-else class="now-list">
         <RouterLink v-for="s in (isTeacher && !can('attendance:read') ? now.slots.filter((x) => x.teacher_id === user.teacher_id) : now.slots).slice(0, 12)"
                     :key="s.id" :to="{ query: { class_id: s.class_id } }" class="now-item" @click="mode = 'class'; classId = s.class_id">
@@ -191,31 +192,31 @@ async function remove() {
           <span>{{ s.course_name }}</span>
           <span class="muted small">{{ s.start_time }}–{{ s.end_time }}<template v-if="s.teacher"> · {{ s.teacher }}</template><template v-if="s.room"> · {{ s.room }}</template></span>
         </RouterLink>
-        <span v-if="now.slots.length > 12" class="muted small">+ {{ now.slots.length - 12 }} more</span>
+        <span v-if="now.slots.length > 12" class="muted small">{{ t('timetable.more', { n: now.slots.length - 12 }) }}</span>
       </div>
     </div>
 
     <div class="card">
       <div class="toolbar">
         <div class="filters">
-          <select v-model="year" aria-label="Academic year">
-            <option v-for="y in years" :key="y.id" :value="y.name">{{ y.name }}{{ y.is_current ? ' (current)' : '' }}</option>
+          <select v-model="year" :aria-label="t('common.academicYear')">
+            <option v-for="y in years" :key="y.id" :value="y.name">{{ y.name }}{{ y.is_current ? t('timetable.current') : '' }}</option>
           </select>
-          <select v-if="can('staff:read') || isTeacher" v-model="mode" aria-label="Show">
-            <option value="class">By class</option>
-            <option value="teacher">{{ can('staff:read') ? 'By teacher' : 'My timetable' }}</option>
+          <select v-if="can('staff:read') || isTeacher" v-model="mode" :aria-label="t('timetable.show')">
+            <option value="class">{{ t('timetable.byClass') }}</option>
+            <option value="teacher">{{ can('staff:read') ? t('timetable.byTeacher') : t('timetable.mine') }}</option>
           </select>
-          <select v-if="mode === 'class'" v-model="classId" aria-label="Class">
-            <option value="" disabled>Choose a class</option>
+          <select v-if="mode === 'class'" v-model="classId" :aria-label="t('common.class')">
+            <option value="" disabled>{{ t('timetable.chooseClass') }}</option>
             <option v-for="c in yearClasses" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
-          <select v-else-if="can('staff:read')" v-model="teacherId" aria-label="Teacher">
-            <option value="">{{ isTeacher ? 'Me' : 'Choose a teacher' }}</option>
-            <option v-for="t in teachers" :key="t.id" :value="t.id">{{ t.last_name }} {{ t.first_name }}</option>
+          <select v-else-if="can('staff:read')" v-model="teacherId" :aria-label="t('common.teacher')">
+            <option value="">{{ isTeacher ? t('timetable.me') : t('timetable.chooseTeacher') }}</option>
+            <option v-for="tc in teachers" :key="tc.id" :value="tc.id">{{ tc.last_name }} {{ tc.first_name }}</option>
           </select>
         </div>
         <span class="muted small">
-          <template v-if="selectedClass && mode === 'class'">{{ selectedClass.level }} · </template>{{ slots.length }} slots · {{ totalHours.toFixed(1).replace('.0', '') }} h/week
+          <template v-if="selectedClass && mode === 'class'">{{ selectedClass.level }} · </template>{{ t('timetable.summary', { n: slots.length, h: totalHours.toFixed(1).replace('.0', '') }) }}
         </span>
       </div>
 
@@ -240,53 +241,53 @@ async function remove() {
                     :style="box(s)" :title="`${s.course_name} · ${s.start_time}–${s.end_time}`" @click="openSlot(s)">
               <b>{{ mode === 'class' ? s.course_name : s.class_name }}</b>
               <span>{{ s.start_time }}–{{ s.end_time }}</span>
-              <span class="tt-meta">{{ mode === 'class' ? s.teacher ?? 'No teacher' : s.course_name }}<template v-if="s.room"> · {{ s.room }}</template></span>
+              <span class="tt-meta">{{ mode === 'class' ? s.teacher ?? t('timetable.noTeacher') : s.course_name }}<template v-if="s.room"> · {{ s.room }}</template></span>
             </button>
           </div>
         </div>
         <div v-if="!loading && !slots.length" class="empty">
           <AppIcon name="grid" size="32" />
-          <p v-if="mode === 'class' && !classId">Choose a class.</p>
-          <p v-else>No slot yet{{ editable && mode === 'class' ? ': click a day or "Add a slot".' : '.' }}</p>
+          <p v-if="mode === 'class' && !classId">{{ t('attendance.chooseClass') }}</p>
+          <p v-else>{{ editable && mode === 'class' ? t('timetable.noSlotEdit') : t('timetable.noSlot') }}</p>
         </div>
       </div>
     </div>
 
-    <SlideOver v-if="form" :title="form.id ? 'Edit slot' : 'New slot'" @close="form = null">
+    <SlideOver v-if="form" :title="form.id ? t('timetable.editSlot') : t('timetable.newSlot')" @close="form = null">
       <div v-if="formError" class="alert"><AppIcon name="alert" />{{ formError }}</div>
       <form id="slot-form" class="form-grid" @submit.prevent="save">
-        <label class="field wide">Class
+        <label class="field wide">{{ t('common.class') }}
           <select v-model="form.class_id" required @change="form.course_id = ''; loadClassCourses()">
             <option v-for="c in yearClasses" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
         </label>
-        <label class="field wide">Course
+        <label class="field wide">{{ t('common.course') }}
           <select v-model="form.course_id" required>
-            <option value="" disabled>Choose a course</option>
-            <option v-for="c in classCourses" :key="c.id" :value="c.id">{{ c.name }} ({{ c.hours_per_week }} h/week)</option>
+            <option value="" disabled>{{ t('timetable.chooseCourse') }}</option>
+            <option v-for="c in classCourses" :key="c.id" :value="c.id">{{ c.name }} ({{ t('timetable.perWeek', { n: c.hours_per_week }) }})</option>
           </select>
-          <span v-if="form.class_id && !classCourses.length" class="muted small">No course in this class yet: add them on the class page.</span>
+          <span v-if="form.class_id && !classCourses.length" class="muted small">{{ t('timetable.noCourse') }}</span>
         </label>
-        <label class="field wide">Day
+        <label class="field wide">{{ t('timetable.day') }}
           <select v-model="form.weekday" required>
             <option v-for="d in WEEKDAYS" :key="d.value" :value="d.value">{{ d.label }}</option>
           </select>
         </label>
-        <label class="field">Starts<input v-model="form.start_time" type="time" required /></label>
-        <label class="field">Ends<input v-model="form.end_time" type="time" required /></label>
-        <label class="field">Room<input v-model="form.room" maxlength="30" placeholder="e.g. Salle 12" /></label>
-        <label v-if="can('staff:read')" class="field">Teacher
+        <label class="field">{{ t('timetable.starts') }}<input v-model="form.start_time" type="time" required /></label>
+        <label class="field">{{ t('timetable.ends') }}<input v-model="form.end_time" type="time" required /></label>
+        <label class="field">{{ t('common.room') }}<input v-model="form.room" maxlength="30" :placeholder="t('timetable.roomHint')" /></label>
+        <label v-if="can('staff:read')" class="field">{{ t('common.teacher') }}
           <select v-model="form.teacher_id">
-            <option value="">Course teacher{{ defaultTeacher ? ` (${defaultTeacher})` : '' }}</option>
-            <option v-for="t in teachers" :key="t.id" :value="t.id">{{ t.last_name }} {{ t.first_name }}</option>
+            <option value="">{{ t('timetable.courseTeacher') }}{{ defaultTeacher ? ` (${defaultTeacher})` : '' }}</option>
+            <option v-for="tc in teachers" :key="tc.id" :value="tc.id">{{ tc.last_name }} {{ tc.first_name }}</option>
           </select>
         </label>
       </form>
-      <p class="muted small" style="margin-top: 1rem">A class, a teacher or a room can't be booked twice at the same time.</p>
+      <p class="muted small" style="margin-top: 1rem">{{ t('timetable.noDouble') }}</p>
       <template #footer>
-        <button v-if="form.id" type="button" class="btn danger-ghost" style="margin-right: auto" @click="remove"><AppIcon name="trash" size="16" />Delete</button>
-        <button type="button" class="btn secondary" @click="form = null">Cancel</button>
-        <button type="submit" form="slot-form" class="btn primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save' }}</button>
+        <button v-if="form.id" type="button" class="btn danger-ghost" style="margin-right: auto" @click="remove"><AppIcon name="trash" size="16" />{{ t('common.delete') }}</button>
+        <button type="button" class="btn secondary" @click="form = null">{{ t('common.cancel') }}</button>
+        <button type="submit" form="slot-form" class="btn primary" :disabled="saving">{{ saving ? t('common.saving') : t('common.save') }}</button>
       </template>
     </SlideOver>
   </section>

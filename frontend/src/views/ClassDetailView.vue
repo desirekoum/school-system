@@ -12,6 +12,7 @@ import AppIcon from '../components/AppIcon.vue';
 import PaginationBar from '../components/PaginationBar.vue';
 import { usePaginatedList } from '../composables/usePaginatedList';
 import { useAuth } from '../composables/useAuth';
+import { t } from '../i18n';
 
 const props = defineProps({ id: String }); // injected from the route via `props: true`
 const { user, can } = useAuth();
@@ -31,12 +32,12 @@ const { items: students, total: studentTotal, totalPages, page, pageSize, loadin
 const route = useRoute();
 const router = useRouter();
 const TABS = [
-  { key: 'overview', label: 'Overview', icon: 'classes' },
-  { key: 'grades', label: 'Grade entry', icon: 'pencil', perm: 'grades:write' },
-  { key: 'results', label: 'Results', icon: 'award', perm: 'grades:read' },
-].filter((t) => !t.perm || can(t.perm));
+  { key: 'overview', label: 'students.overview', icon: 'classes' },
+  { key: 'grades', label: 'students.gradeEntry', icon: 'pencil', perm: 'grades:write' },
+  { key: 'results', label: 'students.results', icon: 'award', perm: 'grades:read' },
+].filter((x) => !x.perm || can(x.perm));
 const tab = computed({
-  get: () => (TABS.some((t) => t.key === route.query.tab) ? route.query.tab : 'overview'),
+  get: () => (TABS.some((x) => x.key === route.query.tab) ? route.query.tab : 'overview'),
   set: (key) => router.replace({ query: { ...route.query, tab: key === 'overview' ? undefined : key } }),
 });
 
@@ -82,21 +83,21 @@ async function unassign(courseId) {
 
 <template>
   <section v-if="cls">
-    <PageHeader :title="cls.name" :subtitle="`${cls.level} · ${cls.academic_year}`" :back="{ to: '/classes', label: 'Classes' }">
-      <RouterLink :to="{ path: '/timetable', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="grid" />Timetable</RouterLink>
-      <RouterLink v-if="can(['attendance:read', 'attendance:take'])" :to="{ path: '/attendance/reports', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="userCheck" />Attendance</RouterLink>
+    <PageHeader :title="cls.name" :subtitle="`${cls.level} · ${cls.academic_year}`" :back="{ to: '/classes', label: t('nav.classes') }">
+      <RouterLink :to="{ path: '/timetable', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="grid" />{{ t('nav.timetable') }}</RouterLink>
+      <RouterLink v-if="can(['attendance:read', 'attendance:take'])" :to="{ path: '/attendance/reports', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="userCheck" />{{ t('nav.attendance') }}</RouterLink>
     </PageHeader>
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
 
     <nav class="tabs-bar">
-      <button v-for="t in TABS" :key="t.key" :class="{ active: tab === t.key }" @click="tab = t.key">
-        <AppIcon :name="t.icon" size="16" />{{ t.label }}
+      <button v-for="tb in TABS" :key="tb.key" :class="{ active: tab === tb.key }" @click="tab = tb.key">
+        <AppIcon :name="tb.icon" size="16" />{{ t(tb.label) }}
       </button>
     </nav>
 
     <template v-if="tab === 'grades'">
       <GradeEntry v-if="exams.length" :class-id="id" :exams="exams" :courses="gradableCourses" />
-      <div v-else class="card empty"><p>The academic year {{ cls.academic_year }} has no exams. Create it in <RouterLink to="/academic-years" class="link">Academic years</RouterLink>.</p></div>
+      <div v-else class="card empty"><i18n-t keypath="students.noExams" tag="p" scope="global"><template #year>{{ cls.academic_year }}</template><template #link><RouterLink to="/academic-years" class="link">{{ t('nav.academicYears') }}</RouterLink></template></i18n-t></div>
     </template>
 
     <ClassResults v-else-if="tab === 'results'" :class-id="id" />
@@ -104,45 +105,45 @@ async function unassign(courseId) {
     <template v-else>
     <div class="stats">
       <div class="card stat"><span class="stat-icon"><AppIcon name="students" size="22" /></span>
-        <div><p class="muted small">Students</p><p class="stat-value">{{ studentTotal }} <small>/ {{ cls.capacity }}</small></p></div></div>
+        <div><p class="muted small">{{ t('common.students') }}</p><p class="stat-value">{{ studentTotal }} <small>/ {{ cls.capacity }}</small></p></div></div>
       <div class="card stat"><span class="stat-icon"><AppIcon name="courses" size="22" /></span>
-        <div><p class="muted small">Courses</p><p class="stat-value">{{ courses.length }}</p></div></div>
+        <div><p class="muted small">{{ t('nav.courses') }}</p><p class="stat-value">{{ courses.length }}</p></div></div>
       <div class="card stat"><span class="stat-icon"><AppIcon name="registrations" size="22" /></span>
-        <div><p class="muted small">Hours / week</p><p class="stat-value">{{ totalHours }}</p></div></div>
+        <div><p class="muted small">{{ t('students.hoursWeek') }}</p><p class="stat-value">{{ totalHours }}</p></div></div>
     </div>
 
     <div class="grid-2">
       <div class="card">
-        <div class="card-header"><h2>Courses &amp; teachers</h2></div>
+        <div class="card-header"><h2>{{ t('students.coursesTeachers') }}</h2></div>
         <form v-if="canAssign" class="inline-form" @submit.prevent="assignCourse">
           <select v-model="assign.course_id" required>
-            <option value="">Course…</option>
+            <option value="">{{ t('students.courseOption') }}</option>
             <option v-for="c in allCourses" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
           <select v-model="assign.teacher_id">
-            <option value="">Teacher…</option>
-            <option v-for="t in teachers" :key="t.id" :value="t.id">{{ t.first_name }} {{ t.last_name }}</option>
+            <option value="">{{ t('students.teacherOption') }}</option>
+            <option v-for="tc in teachers" :key="tc.id" :value="tc.id">{{ tc.first_name }} {{ tc.last_name }}</option>
           </select>
-          <button type="submit" class="btn primary"><AppIcon name="plus" />Assign</button>
+          <button type="submit" class="btn primary"><AppIcon name="plus" />{{ t('students.assign') }}</button>
         </form>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>Course</th><th>Coef.</th><th>Teacher</th><th></th></tr></thead>
+            <thead><tr><th>{{ t('common.course') }}</th><th>{{ t('grades.coefShort') }}</th><th>{{ t('common.teacher') }}</th><th></th></tr></thead>
             <tbody>
               <tr v-for="c in courses" :key="c.id">
-                <td><div class="strong">{{ c.name }}</div><div class="muted small">{{ c.code }} · {{ c.hours_per_week }} h/week</div></td>
+                <td><div class="strong">{{ c.name }}</div><div class="muted small">{{ c.code }} · {{ t('students.perWeek', { n: c.hours_per_week }) }}</div></td>
                 <td>{{ c.coefficient }}</td>
                 <td>{{ c.teacher ?? '—' }}</td>
-                <td class="right"><button v-if="canAssign" class="icon-btn danger" title="Remove" @click="unassign(c.id)"><AppIcon name="trash" size="16" /></button></td>
+                <td class="right"><button v-if="canAssign" class="icon-btn danger" :title="t('common.remove')" @click="unassign(c.id)"><AppIcon name="trash" size="16" /></button></td>
               </tr>
             </tbody>
           </table>
-          <div v-if="!courses.length" class="empty"><p>No course assigned yet.</p></div>
+          <div v-if="!courses.length" class="empty"><p>{{ t('students.noCourse') }}</p></div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header"><h2>Students</h2><RouterLink to="/registrations" class="link">Register a student</RouterLink></div>
+        <div class="card-header"><h2>{{ t('common.students') }}</h2><RouterLink to="/registrations" class="link">{{ t('students.registerStudent') }}</RouterLink></div>
         <ul class="list">
           <li v-for="s in students" :key="s.id">
             <RouterLink :to="`/students/${s.id}`" class="identity">
@@ -151,7 +152,7 @@ async function unassign(courseId) {
             </RouterLink>
             <StatusBadge :value="s.registration_status" />
           </li>
-          <li v-if="!rosterLoading && !students.length" class="muted">No students registered.</li>
+          <li v-if="!rosterLoading && !students.length" class="muted">{{ t('students.noStudents') }}</li>
         </ul>
         <PaginationBar v-if="studentTotal > pageSize" v-model:page="page" v-model:page-size="pageSize" :total="studentTotal" :total-pages="totalPages" />
       </div>

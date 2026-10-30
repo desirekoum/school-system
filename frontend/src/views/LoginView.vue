@@ -5,6 +5,8 @@ import AppIcon from '../components/AppIcon.vue';
 import logo from '../assets/logo.png';
 import { authApi } from '../api/http';
 import { useAuth } from '../composables/useAuth';
+import LanguageSwitch from '../components/LanguageSwitch.vue';
+import { t } from '../i18n';
 
 /**
  * Two-step sign-in (multi-factor):
@@ -24,11 +26,6 @@ const error = ref('');
 const info = ref('');
 const codeInput = ref(null);
 
-const METHOD_TEXT = {
-  totp: 'Enter the 6-digit code shown in your authenticator app.',
-  email: 'We sent a 6-digit code by email to',
-  sms: 'We sent a 6-digit code by SMS to',
-};
 
 // Resend countdown (the server refuses a new code within 30 s)
 const wait = ref(0);
@@ -81,7 +78,7 @@ async function resend() {
   error.value = '';
   try {
     const r = await authApi.resend(challenge.value.challenge);
-    info.value = `A new code was sent to ${r.destination}.`;
+    info.value = t('auth.newCodeSent', { to: r.destination });
     startCountdown();
   } catch (e) {
     error.value = e.message;
@@ -103,52 +100,52 @@ const setup = computed(() => challenge.value?.setup);
   <div class="auth-page">
     <div class="auth-wrap">
       <div class="auth-card">
-        <div class="brand"><img :src="logo" alt="" /><span>School<b>Doc</b></span></div>
+        <div class="auth-top"><div class="brand"><img :src="logo" alt="" /><span>School<b>Doc</b></span></div><LanguageSwitch /></div>
 
         <template v-if="step === 'password'">
-          <h1>Sign in</h1>
-          <p class="lead">Use the account given by your system administrator.</p>
+          <h1>{{ t('auth.signIn') }}</h1>
+          <p class="lead">{{ t('auth.lead') }}</p>
           <div v-if="error" class="alert" role="alert"><AppIcon name="alert" />{{ error }}</div>
           <form @submit.prevent="submitPassword">
-            <label class="field">Username
+            <label class="field">{{ t('auth.username') }}
               <input v-model="form.username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
             </label>
-            <label class="field">Password
+            <label class="field">{{ t('auth.password') }}
               <input v-model="form.password" type="password" autocomplete="current-password" required />
             </label>
-            <button class="btn primary" :disabled="busy">{{ busy ? 'Checking…' : 'Continue' }}</button>
+            <button class="btn primary" :disabled="busy">{{ busy ? t('auth.checking') : t('auth.continue') }}</button>
           </form>
         </template>
 
         <template v-else>
-          <h1>{{ setup ? 'Set up your authenticator' : 'Verification code' }}</h1>
+          <h1>{{ setup ? t('auth.setupTitle') : t('auth.codeTitle') }}</h1>
           <p class="lead">
-            <template v-if="setup">Scan this QR code with Google Authenticator, Microsoft Authenticator or Authy, then enter the code it shows.</template>
-            <template v-else>{{ METHOD_TEXT[challenge.method] }} <b v-if="challenge.method !== 'totp'">{{ challenge.destination }}</b></template>
+            <template v-if="setup">{{ t('auth.setupLead') }}</template>
+            <template v-else>{{ t(`auth.${challenge.method}`) }} <b v-if="challenge.method !== 'totp'">{{ challenge.destination }}</b></template>
           </p>
           <div v-if="error" class="alert" role="alert"><AppIcon name="alert" />{{ error }}</div>
           <div v-if="info" class="alert success"><AppIcon name="check" />{{ info }}</div>
           <form @submit.prevent="submitCode">
             <div v-if="setup" class="qr-box">
-              <img :src="setup.qr" alt="QR code to scan with an authenticator app" />
-              <span class="muted small">Can't scan? Enter this key manually:</span>
+              <img :src="setup.qr" :alt="t('auth.qrAlt')" />
+              <span class="muted small">{{ t('auth.manualKey') }}</span>
               <code>{{ setup.secret.match(/.{1,4}/g).join(' ') }}</code>
             </div>
-            <label class="field">6-digit code
+            <label class="field">{{ t('auth.code') }}
               <input ref="codeInput" :value="code" class="code-input" inputmode="numeric" autocomplete="one-time-code"
-                     maxlength="6" pattern="\d{6}" required aria-label="6-digit code" @input="onCodeInput" />
+                     maxlength="6" pattern="\d{6}" required :aria-label="t('auth.code')" @input="onCodeInput" />
             </label>
-            <button class="btn primary" :disabled="busy || code.length !== 6">{{ busy ? 'Verifying…' : 'Sign in' }}</button>
+            <button class="btn primary" :disabled="busy || code.length !== 6">{{ busy ? t('auth.verifying') : t('auth.signIn') }}</button>
           </form>
           <div class="auth-foot" style="margin-top: 1rem">
-            <button type="button" @click="back()">← Use another account</button>
+            <button type="button" @click="back()">{{ t('auth.otherAccount') }}</button>
             <button v-if="challenge.method !== 'totp'" type="button" :disabled="wait > 0" @click="resend">
-              {{ wait > 0 ? `Resend code in ${wait} s` : 'Resend code' }}
+              {{ wait > 0 ? t('auth.resendIn', { n: wait }) : t('auth.resend') }}
             </button>
           </div>
         </template>
       </div>
-      <p class="auth-secure"><AppIcon name="lock" size="14" />Encrypted connection (HTTPS) · two-step verification</p>
+      <p class="auth-secure"><AppIcon name="lock" size="14" />{{ t('auth.secure') }}</p>
     </div>
   </div>
 </template>

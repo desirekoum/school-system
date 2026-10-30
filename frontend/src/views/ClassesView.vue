@@ -5,6 +5,7 @@ import { useAuth } from '../composables/useAuth';
 import AppIcon from '../components/AppIcon.vue';
 import { classesApi, teachersApi, academicYearsApi } from '../api/http';
 import { money } from '../config/finance';
+import { t } from '../i18n';
 
 const { can } = useAuth();
 
@@ -17,34 +18,34 @@ onMounted(async () => {
 
 // computed: re-evaluates when `teachers` changes, so the select options stay in sync
 const fields = computed(() => [
-  { key: 'name', label: 'Name', required: true },
-  { key: 'level', label: 'Level', required: true },
+  { key: 'name', label: t('common.name'), required: true },
+  { key: 'level', label: t('pages.classes.level'), required: true },
   {
     key: 'academic_year',
-    label: 'Year',
+    label: t('common.year'),
     required: true,
     filter: true,
     default: years.value.find((y) => y.is_current)?.name,
     options: years.value.map((y) => ({ value: y.name, label: y.name })),
   },
-  { key: 'capacity', label: 'Capacity', type: 'number', required: true, default: 40 },
-  { key: 'tuition_fee', label: 'Tuition (FCFA)', type: 'number', required: true, default: 0, format: money },
+  { key: 'capacity', label: t('pages.classes.capacity'), type: 'number', required: true, default: 40 },
+  { key: 'tuition_fee', label: t('pages.classes.tuition'), type: 'number', required: true, default: 0, format: money },
   {
     key: 'homeroom_teacher_id',
-    label: 'Homeroom teacher',
-    options: teachers.value.map((t) => ({ value: t.id, label: `${t.first_name} ${t.last_name}` })),
+    label: t('pages.classes.homeroom'),
+    options: teachers.value.map((x) => ({ value: x.id, label: `${x.first_name} ${x.last_name}` })),
   },
-  { key: 'enrolled', label: 'Enrolled', form: false },
+  { key: 'enrolled', label: t('pages.classes.enrolled'), form: false },
 ]);
 
 </script>
 
 <template>
-  <CrudPage title="Classes" singular="class" subtitle="Classes per academic year, homeroom teachers and enrollment."
+  <CrudPage :title="t('pages.classes.title')" :singular="t('pages.classes.singular')" :subtitle="t('pages.classes.subtitle')"
             :api="classesApi" :readonly="!can('academics:write')" :fields="fields"
-            :imports="[{ entity: 'classes', label: 'Classes' }, { entity: 'class-courses', label: 'Courses taught per class (and their teacher)' }]" export-name="classes">
+            :imports="[{ entity: 'classes', label: t('pages.classes.title') }, { entity: 'class-courses', label: t('pages.classes.importClassCourses') }]" export-name="classes">
     <template #actions="{ row }">
-      <RouterLink :to="`/classes/${row.id}`" class="icon-btn" title="Open"><AppIcon name="chevronRight" size="16" /></RouterLink>
+      <RouterLink :to="`/classes/${row.id}`" class="icon-btn" :title="t('common.open')"><AppIcon name="chevronRight" size="16" /></RouterLink>
     </template>
   </CrudPage>
 </template>

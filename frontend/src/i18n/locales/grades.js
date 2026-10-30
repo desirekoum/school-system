@@ -1,0 +1,31 @@
+// Grade entry, class results and report cards
+export default {
+  en: {
+    examLabel: 'T{trimester} · Exam {number}', ordinal: '{n}{suffix}', ordinalSuffix: { one: 'st', two: 'nd', few: 'rd', other: 'th' },
+    exam: 'Exam', examN: 'Exam {n}', coef: 'coef. {n}', gradedStats: '{count}/{total} graded · average {avg} · {pass}% ≥ {mark}', average: 'average',
+    discard: 'You have unsaved grades. Discard them?', saved: 'No grade saved | 1 grade saved | {n} grades saved', removed: ', {n} removed',
+    noCourse: 'No course is assigned to this class yet. Assign courses in the Overview tab.', score: 'Score / 20', comment: 'Comment', scoreFor: 'Score for {name}',
+    noStudent: 'No student registered in this class.', invalid: '{n} invalid score | {n} invalid scores', invalidHelp: ': use a number between 0 and 20.',
+    unsaved: '{n} unsaved change. Leave a score empty to remove it. | {n} unsaved changes. Leave a score empty to remove it.',
+    tip: 'Tip: press Enter to move to the next student.', saveGrades: 'Save grades',
+    trimesterN: 'Trimester {n}', fullYear: 'Full year', classAverage: 'Class average', passRate: 'Pass rate (≥ {mark})', highLow: 'Highest / lowest',
+    gradedOf: '{graded} of {students} students graded', rank: 'Rank', general: 'General', mention: 'Mention', coefficientX: '{name} · coefficient {n}',
+    resultsFoot: 'Course average = mean of the exams in the period. General average = course averages weighted by coefficient.',
+    reportCard: 'Report card', noGrades: 'No registration, so no grades yet.', coefShort: 'Coef.', year: 'Year', avg: 'Avg',
+    generalAverage: 'General average', classAvg: 'class avg {n}', yearLabel: 'Year:',
+  },
+  fr: {
+    examLabel: 'T{trimester} · Évaluation {number}', ordinal: '{n}{suffix}', ordinalSuffix: { one: 'er', two: 'e', few: 'e', other: 'e' },
+    exam: 'Évaluation', examN: 'Éval. {n}', coef: 'coef. {n}', gradedStats: '{count}/{total} notés · moyenne {avg} · {pass} % ≥ {mark}', average: 'moyenne',
+    discard: 'Des notes ne sont pas enregistrées. Les abandonner ?', saved: 'Aucune note enregistrée | 1 note enregistrée | {n} notes enregistrées', removed: ', {n} supprimée(s)',
+    noCourse: 'Aucune matière n’est encore affectée à cette classe. Affectez des matières dans l’onglet Vue d’ensemble.', score: 'Note / 20', comment: 'Appréciation', scoreFor: 'Note de {name}',
+    noStudent: 'Aucun élève inscrit dans cette classe.', invalid: '{n} note invalide | {n} notes invalides', invalidHelp: ' : saisissez un nombre entre 0 et 20.',
+    unsaved: '{n} modification non enregistrée. Videz une note pour la supprimer. | {n} modifications non enregistrées. Videz une note pour la supprimer.',
+    tip: 'Astuce : appuyez sur Entrée pour passer à l’élève suivant.', saveGrades: 'Enregistrer les notes',
+    trimesterN: 'Trimestre {n}', fullYear: 'Année complète', classAverage: 'Moyenne de la classe', passRate: 'Taux de réussite (≥ {mark})', highLow: 'Plus haute / plus basse',
+    gradedOf: '{graded} élèves notés sur {students}', rank: 'Rang', general: 'Générale', mention: 'Mention', coefficientX: '{name} · coefficient {n}',
+    resultsFoot: 'Moyenne par matière = moyenne des évaluations de la période. Moyenne générale = moyennes des matières pondérées par coefficient.',
+    reportCard: 'Bulletin', noGrades: 'Pas d’inscription, donc pas encore de notes.', coefShort: 'Coef.', year: 'Année', avg: 'Moy.',
+    generalAverage: 'Moyenne générale', classAvg: 'moy. classe {n}', yearLabel: 'Année :',
+  },
+};

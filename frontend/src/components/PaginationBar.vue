@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import AppIcon from './AppIcon.vue';
 import { PAGE_SIZES } from '../composables/usePaginatedList';
+import { t, fmtNum } from '../i18n';
 
 const props = defineProps({ total: Number, totalPages: Number });
 // defineModel: two-way binding, used as v-model:page and v-model:page-size by the parent
@@ -29,22 +30,25 @@ const pages = computed(() => {
 <template>
   <div class="pagination">
     <p class="muted small">
-      Showing <b>{{ from.toLocaleString() }}–{{ to.toLocaleString() }}</b> of <b>{{ total.toLocaleString() }}</b>
+      <i18n-t keypath="crud.showing" scope="global">
+        <template #range><b>{{ fmtNum(from) }}–{{ fmtNum(to) }}</b></template>
+        <template #total><b>{{ fmtNum(total) }}</b></template>
+      </i18n-t>
     </p>
     <div class="pagination-controls">
       <label class="page-size muted small">
-        Rows per page
+        {{ t('crud.rowsPerPage') }}
         <select v-model.number="pageSize">
           <option v-for="n in PAGE_SIZES" :key="n" :value="n">{{ n }}</option>
         </select>
       </label>
-      <nav class="pages" aria-label="Pagination">
-        <button class="icon-btn" :disabled="page <= 1" aria-label="Previous page" @click="page--"><AppIcon name="chevronLeft" size="16" /></button>
+      <nav class="pages" :aria-label="t('crud.pagination')">
+        <button class="icon-btn" :disabled="page <= 1" :aria-label="t('crud.prevPage')" @click="page--"><AppIcon name="chevronLeft" size="16" /></button>
         <template v-for="p in pages" :key="p">
           <span v-if="typeof p === 'string'" class="gap">…</span>
           <button v-else :class="['page-btn', { active: p === page }]" :aria-current="p === page ? 'page' : null" @click="page = p">{{ p }}</button>
         </template>
-        <button class="icon-btn" :disabled="page >= totalPages" aria-label="Next page" @click="page++"><AppIcon name="chevronRight" size="16" /></button>
+        <button class="icon-btn" :disabled="page >= totalPages" :aria-label="t('crud.nextPage')" @click="page++"><AppIcon name="chevronRight" size="16" /></button>
       </nav>
     </div>
   </div>

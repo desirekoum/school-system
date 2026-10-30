@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import AppIcon from './AppIcon.vue';
+import { t } from '../i18n';
 
 // "Export" button with a format choice; the parent does the export in @export(format)
 defineProps({ busy: Boolean });
@@ -22,7 +23,7 @@ function pick(format) {
 <template>
   <div ref="root" class="menu-wrap">
     <button type="button" class="btn secondary" :disabled="busy" :aria-expanded="open" aria-haspopup="menu" @click="open = !open">
-      <AppIcon name="download" />{{ busy ? 'Exporting…' : 'Export' }}<AppIcon name="chevronDown" size="14" />
+      <AppIcon name="download" />{{ busy ? t('common.exporting') : t('common.export') }}<AppIcon name="chevronDown" size="14" />
     </button>
     <Transition name="pop">
       <div v-if="open" class="user-dropdown menu-dropdown" role="menu">

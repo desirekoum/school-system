@@ -10,6 +10,7 @@ import AppIcon from './AppIcon.vue';
 import ExportMenu from './ExportMenu.vue';
 import ImportDialog from './ImportDialog.vue';
 import { exportRows } from '../utils/xlsx';
+import { t } from '../i18n';
 
 /**
  * Generic list + form page driven by a `fields` config:
@@ -22,7 +23,7 @@ import { exportRows } from '../utils/xlsx';
 const props = defineProps({
   title: String,
   subtitle: String,
-  singular: { type: String, default: 'record' },
+  singular: { type: String, default: 'record' }, // e.g. "student" / "un élève" (used in "New …")
   api: Object,
   fields: Array,
   identity: Function,
@@ -78,7 +79,7 @@ async function submit() {
 }
 
 async function confirmRemove(row) {
-  if (!confirm(`Delete this ${props.singular}?`)) return;
+  if (!confirm(t('crud.confirmDelete', { singular: props.singular }))) return;
   try {
     await props.api.remove(row.id);
     await load();
@@ -114,8 +115,8 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
   <section>
     <PageHeader :title="title" :subtitle="subtitle">
       <ExportMenu :busy="exporting" @export="exportList" />
-      <button v-if="!readonly && imports?.length" class="btn secondary" @click="importing = true"><AppIcon name="upload" />Import</button>
-      <button v-if="!readonly" class="btn primary" @click="openNew"><AppIcon name="plus" />New {{ singular }}</button>
+      <button v-if="!readonly && imports?.length" class="btn secondary" @click="importing = true"><AppIcon name="upload" />{{ t('common.import') }}</button>
+      <button v-if="!readonly" class="btn primary" @click="openNew"><AppIcon name="plus" />{{ t('crud.newItem', { singular }) }}</button>
     </PageHeader>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
@@ -124,11 +125,11 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
       <div class="toolbar">
         <label class="search">
           <AppIcon name="search" size="16" />
-          <input v-model="search" type="search" :placeholder="`Search ${title.toLowerCase()}…`" />
+          <input v-model="search" type="search" :placeholder="t('crud.searchIn', { title: title.toLowerCase() })" />
         </label>
         <div class="filters">
-          <select v-for="f in filterFields" :key="f.key" v-model="filters[f.key]" :aria-label="`Filter by ${f.label}`">
-            <option value="">Any {{ f.label.toLowerCase() }}</option>
+          <select v-for="f in filterFields" :key="f.key" v-model="filters[f.key]" :aria-label="t('crud.filterBy', { label: f.label })">
+            <option value="">{{ t('crud.anyOf', { label: f.label.toLowerCase() }) }}</option>
             <option v-for="o in f.options" :key="o.value" :value="o.value">{{ o.label }}</option>
           </select>
         </div>
@@ -138,9 +139,9 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
         <table class="table">
           <thead>
             <tr>
-              <th v-if="identity">Name</th>
+              <th v-if="identity">{{ t('common.name') }}</th>
               <th v-for="f in listFields" :key="f.key">{{ f.label }}</th>
-              <th class="right">Actions</th>
+              <th class="right">{{ t('common.actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -161,18 +162,18 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
               <td class="right">
                 <div class="row-actions">
                   <slot name="actions" :row="row" />
-                  <button v-if="!readonly" class="icon-btn" title="Edit" @click="openEdit(row)"><AppIcon name="edit" size="16" /></button>
-                  <button v-if="!readonly" class="icon-btn danger" title="Delete" @click="confirmRemove(row)"><AppIcon name="trash" size="16" /></button>
+                  <button v-if="!readonly" class="icon-btn" :title="t('common.edit')" @click="openEdit(row)"><AppIcon name="edit" size="16" /></button>
+                  <button v-if="!readonly" class="icon-btn danger" :title="t('common.delete')" @click="confirmRemove(row)"><AppIcon name="trash" size="16" /></button>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="loading && !items.length" class="empty">Loading…</div>
+        <div v-if="loading && !items.length" class="empty">{{ t('common.loading') }}</div>
         <div v-else-if="!items.length" class="empty">
           <AppIcon name="inbox" size="32" />
-          <p>{{ isFiltered ? 'No match for your search.' : `No ${title.toLowerCase()} yet.` }}</p>
-          <button v-if="!isFiltered && !readonly" class="btn secondary" @click="openNew"><AppIcon name="plus" />Add the first one</button>
+          <p>{{ isFiltered ? t('common.noMatch') : t('crud.emptyList', { title: title.toLowerCase() }) }}</p>
+          <button v-if="!isFiltered && !readonly" class="btn secondary" @click="openNew"><AppIcon name="plus" />{{ t('crud.addFirst') }}</button>
         </div>
       </div>
       <PaginationBar v-if="total" v-model:page="page" v-model:page-size="pageSize" :total="total" :total-pages="totalPages" />
@@ -180,7 +181,7 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
 
     <ImportDialog v-if="importing" :imports="imports" @close="importing = false" @done="load" />
 
-    <SlideOver v-if="form" :title="form.id ? `Edit ${singular}` : `New ${singular}`" @close="form = null">
+    <SlideOver v-if="form" :title="t(form.id ? 'crud.editItem' : 'crud.newItem', { singular })" @close="form = null">
       <div v-if="formError" class="alert"><AppIcon name="alert" />{{ formError }}</div>
       <form id="crud-form" @submit.prevent="submit">
         <fieldset v-for="s in sections" :key="s.name" class="form-section">
@@ -199,8 +200,8 @@ const label = (f, row) => (f.format ? f.format(row[f.key]) : f.options?.find((o)
         </fieldset>
       </form>
       <template #footer>
-        <button type="button" class="btn secondary" @click="form = null">Cancel</button>
-        <button type="submit" form="crud-form" class="btn primary" :disabled="saving">{{ saving ? 'Saving…' : 'Save' }}</button>
+        <button type="button" class="btn secondary" @click="form = null">{{ t('common.cancel') }}</button>
+        <button type="submit" form="crud-form" class="btn primary" :disabled="saving">{{ saving ? t('common.saving') : t('common.save') }}</button>
       </template>
     </SlideOver>
   </section>

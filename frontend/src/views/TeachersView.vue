@@ -1,39 +1,42 @@
 <script setup>
+import { computed } from 'vue';
 import CrudPage from '../components/CrudPage.vue';
 import { useAuth } from '../composables/useAuth';
 import { teachersApi } from '../api/http';
 import { GENDERS, TEACHER_STATUSES, CONTRACT_TYPES } from '../config/options';
+import { t } from '../i18n';
 
-const fields = [
-  { section: 'Identity', key: 'employee_number', label: 'Employee no.' },
-  { section: 'Identity', key: 'last_name', label: 'Last name', required: true, list: false },
-  { section: 'Identity', key: 'first_name', label: 'First name', required: true, list: false },
-  { section: 'Identity', key: 'gender', label: 'Gender', options: GENDERS, list: false },
-  { section: 'Identity', key: 'birth_date', label: 'Birth date', type: 'date', list: false },
-  { section: 'Identity', key: 'photo_url', label: 'Photo URL', type: 'url', list: false },
+const f = (key) => t(`fields.${key}`);
+const fields = computed(() => [
+  { section: f('identity'), key: 'employee_number', label: f('employeeNo') },
+  { section: f('identity'), key: 'last_name', label: f('lastName'), required: true, list: false },
+  { section: f('identity'), key: 'first_name', label: f('firstName'), required: true, list: false },
+  { section: f('identity'), key: 'gender', label: f('gender'), options: GENDERS, list: false },
+  { section: f('identity'), key: 'birth_date', label: f('birthDate'), type: 'date', list: false },
+  { section: f('identity'), key: 'photo_url', label: f('photoUrl'), type: 'url', list: false },
 
-  { section: 'Contact', key: 'email', label: 'Email', type: 'email', required: true, list: false },
-  { section: 'Contact', key: 'phone', label: 'Phone' },
-  { section: 'Contact', key: 'address', label: 'Address', list: false },
+  { section: f('contact'), key: 'email', label: f('email'), type: 'email', required: true, list: false },
+  { section: f('contact'), key: 'phone', label: f('phone') },
+  { section: f('contact'), key: 'address', label: f('address'), list: false },
 
-  { section: 'Job', key: 'specialty', label: 'Specialty' },
-  { section: 'Job', key: 'status', label: 'Status', options: TEACHER_STATUSES, required: true, default: 'active', badge: true, filter: true },
-  { section: 'Job', key: 'contract_type', label: 'Contract', options: CONTRACT_TYPES, filter: true },
-  { section: 'Job', key: 'hire_date', label: 'Hire date', type: 'date', list: false },
-  { section: 'Job', key: 'qualifications', label: 'Qualifications / diplomas', type: 'textarea', list: false },
+  { section: f('job'), key: 'specialty', label: f('specialty') },
+  { section: f('job'), key: 'status', label: f('status'), options: TEACHER_STATUSES, required: true, default: 'active', badge: true, filter: true },
+  { section: f('job'), key: 'contract_type', label: f('contract'), options: CONTRACT_TYPES, filter: true },
+  { section: f('job'), key: 'hire_date', label: f('hireDate'), type: 'date', list: false },
+  { section: f('job'), key: 'qualifications', label: f('qualifications'), type: 'textarea', list: false },
 
-  { section: 'Pay', key: 'salary', label: 'Monthly salary', type: 'number', step: '0.01', list: false },
-  { section: 'Pay', key: 'hourly_rate', label: 'Hourly rate', type: 'number', step: '0.01', list: false },
-  { section: 'Pay', key: 'bank_account', label: 'Bank account', list: false },
-];
+  { section: f('pay'), key: 'salary', label: f('salary'), type: 'number', step: '0.01', list: false },
+  { section: f('pay'), key: 'hourly_rate', label: f('hourlyRate'), type: 'number', step: '0.01', list: false },
+  { section: f('pay'), key: 'bank_account', label: f('bankAccount'), list: false },
+]);
 
-const identity = (t) => ({ name: `${t.first_name} ${t.last_name}`, sub: t.email, photo: t.photo_url });
+const identity = (r) => ({ name: `${r.first_name} ${r.last_name}`, sub: r.email, photo: r.photo_url });
 
 const { can } = useAuth();
 </script>
 
 <template>
-  <CrudPage title="Teachers" singular="teacher" subtitle="Teaching staff, contracts and pay details."
+  <CrudPage :title="t('pages.teachers.title')" :singular="t('pages.teachers.singular')" :subtitle="t('pages.teachers.subtitle')"
             :api="teachersApi" :readonly="!can('staff:write')" :fields="fields"
-            :imports="[{ entity: 'teachers', label: 'Teachers' }]" export-name="teachers" :identity="identity" />
+            :imports="[{ entity: 'teachers', label: t('pages.teachers.title') }]" export-name="teachers" :identity="identity" />
 </template>

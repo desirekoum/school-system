@@ -9,6 +9,7 @@ import { usePaginatedList } from '../composables/usePaginatedList';
 import { money, METHODS, methodLabel } from '../config/finance';
 import { exportRows } from '../utils/xlsx';
 import ExportMenu from '../components/ExportMenu.vue';
+import { t, fmtDate } from '../i18n';
 
 const years = ref([]);
 const { items, total, totalPages, page, pageSize, search, filters, loading, error, meta } = usePaginatedList(
@@ -33,9 +34,9 @@ async function exportList(format) {
   try {
     const rows = await financesApi.payments({ ...filters, search: search.value || undefined });
     await exportRows(format, `payments-${filters.from || 'all'}-${filters.to || 'all'}`, rows, [
-      ['receipt_number', 'Receipt'], ['paid_at', 'Date'], ['student', 'Student'], ['matricule', 'Matricule'], ['class_name', 'Class'],
-      ['academic_year', 'Year'], ['method', 'Method', methodLabel], ['reference', 'Reference'], ['amount', 'Amount (FCFA)'],
-      ['received_by', 'Received by'], ['voided', 'Voided']]);
+      ['receipt_number', t('finance.receipt')], ['paid_at', t('common.date')], ['student', t('common.student')], ['matricule', t('fields.matricule')], ['class_name', t('common.class')],
+      ['academic_year', t('common.year')], ['method', t('common.method'), methodLabel], ['reference', t('common.reference')], ['amount', t('finance.amountFcfa')],
+      ['received_by', t('finance.receivedBy')], ['voided', t('finance.voided'), (v) => t(`common.${v ? 'yes' : 'no'}`)]]);
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -46,7 +47,7 @@ async function exportList(format) {
 
 <template>
   <section>
-    <PageHeader title="Tuition payments" subtitle="Journal of every tuition payment received, with its receipt.">
+    <PageHeader :title="t('finance.paymentsTitle')" :subtitle="t('finance.paymentsSubtitle')">
       <ExportMenu :busy="exporting" @export="exportList" />
     </PageHeader>
 
@@ -55,49 +56,49 @@ async function exportList(format) {
     <div class="card">
       <div class="toolbar">
         <div class="segmented" style="margin: 0">
-          <button v-for="r in [['', 'All'], ['today', 'Today'], ['week', 'This week'], ['month', 'This month']]" :key="r[0]" type="button" @click="range(r[0])">{{ r[1] }}</button>
+          <button v-for="r in ['', 'today', 'week', 'month']" :key="r" type="button" @click="range(r)">{{ t(`finance.ranges.${r || 'all'}`) }}</button>
         </div>
         <label class="search">
           <AppIcon name="search" size="16" />
-          <input v-model="search" type="search" placeholder="Receipt, student, reference…" />
+          <input v-model="search" type="search" :placeholder="t('finance.searchPayments')" />
         </label>
       </div>
       <div class="toolbar filters">
-        <label class="inline-field"><span class="muted small">From</span><input v-model="filters.from" type="date" /></label>
-        <label class="inline-field"><span class="muted small">To</span><input v-model="filters.to" type="date" /></label>
-        <select v-model="filters.method" aria-label="Method">
-          <option value="">All methods</option>
+        <label class="inline-field"><span class="muted small">{{ t('common.from') }}</span><input v-model="filters.from" type="date" /></label>
+        <label class="inline-field"><span class="muted small">{{ t('common.to') }}</span><input v-model="filters.to" type="date" /></label>
+        <select v-model="filters.method" :aria-label="t('common.method')">
+          <option value="">{{ t('finance.allMethods') }}</option>
           <option v-for="m in METHODS" :key="m.value" :value="m.value">{{ m.label }}</option>
         </select>
-        <select v-model="filters.academic_year" aria-label="Academic year">
-          <option value="">All years</option>
+        <select v-model="filters.academic_year" :aria-label="t('common.academicYear')">
+          <option value="">{{ t('finance.allYears') }}</option>
           <option v-for="y in years" :key="y.id" :value="y.name">{{ y.name }}</option>
         </select>
-        <select v-model="filters.voided" aria-label="Voided">
-          <option value="">Valid and voided</option>
-          <option value="false">Valid only</option>
-          <option value="true">Voided only</option>
+        <select v-model="filters.voided" :aria-label="t('finance.voidedFilter')">
+          <option value="">{{ t('finance.validAndVoided') }}</option>
+          <option value="false">{{ t('finance.validOnly') }}</option>
+          <option value="true">{{ t('finance.voidedOnly') }}</option>
         </select>
-        <span class="journal-total">Total <b>{{ money(meta.sum ?? 0) }}</b></span>
+        <span class="journal-total">{{ t('common.total') }} <b>{{ money(meta.sum ?? 0) }}</b></span>
       </div>
 
       <div class="table-wrap" :class="{ 'is-loading': loading && items.length }">
         <table class="table">
-          <thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Class</th><th>Method</th><th class="num">Amount</th><th>Received by</th><th /></tr></thead>
+          <thead><tr><th>{{ t('finance.receipt') }}</th><th>{{ t('common.date') }}</th><th>{{ t('common.student') }}</th><th>{{ t('common.class') }}</th><th>{{ t('common.method') }}</th><th class="num">{{ t('common.amount') }}</th><th>{{ t('finance.receivedBy') }}</th><th /></tr></thead>
           <tbody>
             <tr v-for="p in items" :key="p.id" :class="{ voided: p.voided }">
-              <td><span class="mono">{{ p.receipt_number }}</span><div v-if="p.voided"><StatusBadge value="voided" :label="`Voided: ${p.void_reason}`" /></div></td>
-              <td>{{ new Date(p.paid_at).toLocaleDateString() }}</td>
+              <td><span class="mono">{{ p.receipt_number }}</span><div v-if="p.voided"><StatusBadge value="voided" :label="t('finance.voidedX', { reason: p.void_reason })" /></div></td>
+              <td>{{ fmtDate(p.paid_at) }}</td>
               <td><RouterLink :to="`/students/${p.student_id}`" class="strong link">{{ p.student }}</RouterLink><div class="muted small">{{ p.matricule }}</div></td>
               <td>{{ p.class_name }}</td>
               <td>{{ methodLabel(p.method) }}<div v-if="p.reference" class="muted small">{{ p.reference }}</div></td>
               <td class="num strong">{{ money(p.amount) }}</td>
               <td class="muted small">{{ p.received_by ?? '—' }}</td>
-              <td class="right"><a :href="`/finances/receipts/${p.id}`" target="_blank" class="icon-btn" title="Print receipt"><AppIcon name="printer" size="16" /></a></td>
+              <td class="right"><a :href="`/finances/receipts/${p.id}`" target="_blank" class="icon-btn" :title="t('finance.printReceipt')"><AppIcon name="printer" size="16" /></a></td>
             </tr>
           </tbody>
         </table>
-        <div v-if="!loading && !items.length" class="empty"><AppIcon name="inbox" size="32" /><p>No payment in this period.</p></div>
+        <div v-if="!loading && !items.length" class="empty"><AppIcon name="inbox" size="32" /><p>{{ t('finance.noPaymentPeriod') }}</p></div>
       </div>
       <PaginationBar v-if="total" v-model:page="page" v-model:page-size="pageSize" :total="total" :total-pages="totalPages" />
     </div>

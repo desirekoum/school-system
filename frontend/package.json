@@ -12,6 +12,7 @@
     "axios": "^1.20.0",
     "exceljs": "^4.4.0",
     "vue": "^3.5.44",
+    "vue-i18n": "^11.4.16",
     "vue-router": "^5.4.0"
   },
   "devDependencies": {

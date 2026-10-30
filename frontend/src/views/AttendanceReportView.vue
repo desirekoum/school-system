@@ -7,8 +7,9 @@ import ExportMenu from '../components/ExportMenu.vue';
 import { attendanceApi, classesApi, coursesApi, academicYearsApi, timetableApi } from '../api/http';
 import { useAuth } from '../composables/useAuth';
 import { exportRows } from '../utils/xlsx';
-import { ATTENDANCE_STATUSES, rateTone, shiftDate } from '../config/attendance';
+import { ATTENDANCE_STATUSES, statusLabel, rateTone, shiftDate } from '../config/attendance';
 import { today } from '../config/finance';
+import { t, fmtNum } from '../i18n';
 
 /**
  * Attendance reports: totals for the whole school, a class or a course, grouped by class, student, course or day.
@@ -31,10 +32,10 @@ const loading = ref(false);
 const error = ref('');
 
 const GROUPS = computed(() => [
-  ...(f.value.class_id ? [{ value: 'student', label: 'Students' }] : [{ value: 'class', label: 'Classes' }]),
-  { value: 'course', label: 'Courses' },
-  { value: 'day', label: 'Days' },
-  ...(f.value.class_id ? [{ value: 'class', label: 'Class total' }] : []),
+  ...(f.value.class_id ? [{ value: 'student', label: t('attendance.groups.student') }] : [{ value: 'class', label: t('attendance.groups.class') }]),
+  { value: 'course', label: t('attendance.groups.course') },
+  { value: 'day', label: t('attendance.groups.day') },
+  ...(f.value.class_id ? [{ value: 'class', label: t('attendance.groups.total') }] : []),
 ]);
 
 onMounted(async () => {
@@ -78,37 +79,37 @@ watch([f, tab, regDate], () => years.value.length && load(), { deep: true });
 
 // Quick periods
 function period(kind) {
-  const t = today();
-  if (kind === 'week') { f.value.from = shiftDate(t, -6); f.value.to = t; }
-  else if (kind === 'month') { f.value.from = shiftDate(t, -29); f.value.to = t; }
+  const d = today();
+  if (kind === 'week') { f.value.from = shiftDate(d, -6); f.value.to = d; }
+  else if (kind === 'month') { f.value.from = shiftDate(d, -29); f.value.to = d; }
   else { f.value.from = ''; f.value.to = ''; }
 }
 
-const groupLabel = computed(() => ({ student: 'Student', class: 'Class', course: 'Course', day: 'Day' })[report.value?.group]);
-const extraLabel = computed(() => ({ student: 'Matricule', class: 'Level', course: 'Code', day: 'Weekday' })[report.value?.group]);
+const groupLabel = computed(() => report.value && t(`attendance.groupLabel.${report.value.group}`));
+const extraLabel = computed(() => report.value && t(`attendance.extraLabel.${report.value.group}`));
 
 function exportReport(format) {
   const g = report.value;
   exportRows(format, `attendance-${g.group}${f.value.class_id ? `-${yearClasses.value.find((c) => c.id === f.value.class_id)?.name ?? ''}` : ''}`.replace(/\s+/g, '-'), g.rows, [
-    ['label', groupLabel.value], ['extra', extraLabel.value], ['sessions', 'Sessions'], ['marks', 'Marks'],
-    ['present', 'Present'], ['absent', 'Absent'], ['late', 'Late'], ['excused', 'Excused'], ['rate', 'Attendance %'],
+    ['label', groupLabel.value], ['extra', extraLabel.value], ['sessions', t('attendance.sessions')], ['marks', t('attendance.marks')],
+    ...ATTENDANCE_STATUSES.map((s) => [s.value, s.label]), ['rate', t('attendance.attendancePct')],
   ]);
 }
 
 const markOf = (st, col) => (col.session_id ? st.marks[col.session_id] : null);
-const SHORT = Object.fromEntries(ATTENDANCE_STATUSES.map((s) => [s.value, s.short]));
+const SHORT = computed(() => Object.fromEntries(ATTENDANCE_STATUSES.map((s) => [s.value, s.short])));
 const regAbsent = (st) => Object.values(st.marks).filter((m) => m === 'absent').length;
 </script>
 
 <template>
   <section>
-    <PageHeader title="Attendance reports" :subtitle="schoolWide ? 'Attendance of the school, a class or a course, over any period.' : 'Attendance of the classes you teach.'">
+    <PageHeader :title="t('attendance.reportsTitle')" :subtitle="schoolWide ? t('attendance.reportsOffice') : t('attendance.reportsTeacher')">
       <ExportMenu v-if="tab === 'summary' && report?.rows.length" @export="exportReport" />
     </PageHeader>
 
     <div class="tabs-bar">
-      <button :class="['tab', { active: tab === 'summary' }]" @click="tab = 'summary'"><AppIcon name="chart" size="16" />Summary</button>
-      <button :class="['tab', { active: tab === 'register' }]" @click="tab = 'register'"><AppIcon name="grid" size="16" />Day register</button>
+      <button :class="['tab', { active: tab === 'summary' }]" @click="tab = 'summary'"><AppIcon name="chart" size="16" />{{ t('attendance.summary') }}</button>
+      <button :class="['tab', { active: tab === 'register' }]" @click="tab = 'register'"><AppIcon name="grid" size="16" />{{ t('attendance.register') }}</button>
     </div>
 
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
@@ -116,36 +117,36 @@ const regAbsent = (st) => Object.values(st.marks).filter((m) => m === 'absent').
     <div class="card">
       <div class="toolbar">
         <div class="filters">
-          <select v-model="f.academic_year" aria-label="Academic year" @change="f.class_id = ''">
+          <select v-model="f.academic_year" :aria-label="t('common.academicYear')" @change="f.class_id = ''">
             <option v-for="y in years" :key="y.id" :value="y.name">{{ y.name }}</option>
           </select>
-          <select v-model="f.class_id" aria-label="Class">
-            <option v-if="schoolWide || tab === 'summary'" value="">{{ schoolWide ? 'Whole school' : 'All my classes' }}</option>
+          <select v-model="f.class_id" :aria-label="t('common.class')">
+            <option v-if="schoolWide || tab === 'summary'" value="">{{ schoolWide ? t('attendance.wholeSchool') : t('attendance.allMine') }}</option>
             <option v-for="c in yearClasses" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
           <template v-if="tab === 'summary'">
-            <select v-model="f.course_id" aria-label="Course">
-              <option value="">All courses</option>
+            <select v-model="f.course_id" :aria-label="t('common.course')">
+              <option value="">{{ t('attendance.allCourses') }}</option>
               <option v-for="c in courses" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
-            <select v-model="f.group" aria-label="Group by">
-              <option value="">By {{ f.class_id ? 'student' : 'class' }}</option>
-              <option v-for="g in GROUPS.slice(1)" :key="g.value" :value="g.value">By {{ g.label.toLowerCase() }}</option>
+            <select v-model="f.group" :aria-label="t('attendance.byX', { x: '' })">
+              <option value="">{{ t('attendance.byX', { x: f.class_id ? t('attendance.groups.student') : t('attendance.groups.class') }) }}</option>
+              <option v-for="g in GROUPS.slice(1)" :key="g.value" :value="g.value">{{ t('attendance.byX', { x: g.label }) }}</option>
             </select>
           </template>
         </div>
         <div v-if="tab === 'summary'" class="filters">
-          <input v-model="f.from" type="date" aria-label="From" />
-          <input v-model="f.to" type="date" aria-label="To" />
-          <button class="btn secondary sm" @click="period('week')">7 days</button>
-          <button class="btn secondary sm" @click="period('month')">30 days</button>
-          <button v-if="f.from || f.to" class="btn secondary sm" @click="period('all')">Whole year</button>
+          <input v-model="f.from" type="date" :aria-label="t('common.from')" />
+          <input v-model="f.to" type="date" :aria-label="t('common.to')" />
+          <button class="btn secondary sm" @click="period('week')">{{ t('attendance.days7') }}</button>
+          <button class="btn secondary sm" @click="period('month')">{{ t('attendance.days30') }}</button>
+          <button v-if="f.from || f.to" class="btn secondary sm" @click="period('all')">{{ t('attendance.wholeYear') }}</button>
         </div>
         <div v-else class="filters">
           <div class="date-nav">
-            <button class="icon-btn" title="Previous day" @click="regDate = shiftDate(regDate, -1)"><AppIcon name="chevronLeft" /></button>
-            <input v-model="regDate" type="date" aria-label="Date" />
-            <button class="icon-btn" title="Next day" @click="regDate = shiftDate(regDate, 1)"><AppIcon name="chevronRight" /></button>
+            <button class="icon-btn" :title="t('common.previousDay')" @click="regDate = shiftDate(regDate, -1)"><AppIcon name="chevronLeft" /></button>
+            <input v-model="regDate" type="date" :aria-label="t('common.date')" />
+            <button class="icon-btn" :title="t('common.nextDay')" @click="regDate = shiftDate(regDate, 1)"><AppIcon name="chevronRight" /></button>
           </div>
         </div>
       </div>
@@ -153,13 +154,13 @@ const regAbsent = (st) => Object.values(st.marks).filter((m) => m === 'absent').
       <!-- Summary -->
       <template v-if="tab === 'summary' && report">
         <div class="att-totals in-card">
-          <div class="att-total rate" :class="rateTone(report.totals.rate)"><b>{{ report.totals.rate ?? '—' }}<small v-if="report.totals.rate != null">%</small></b><span>Attendance rate</span></div>
-          <div v-for="s in ATTENDANCE_STATUSES" :key="s.value" :class="['att-total', s.value]"><b>{{ report.totals[s.value].toLocaleString() }}</b><span>{{ s.label }}</span></div>
+          <div class="att-total rate" :class="rateTone(report.totals.rate)"><b>{{ report.totals.rate ?? '—' }}<small v-if="report.totals.rate != null">%</small></b><span>{{ t('attendance.rate') }}</span></div>
+          <div v-for="s in ATTENDANCE_STATUSES" :key="s.value" :class="['att-total', s.value]"><b>{{ fmtNum(report.totals[s.value]) }}</b><span>{{ s.label }}</span></div>
         </div>
         <div class="table-wrap" :class="{ 'is-loading': loading }">
           <table class="table">
             <thead>
-              <tr><th>{{ groupLabel }}</th><th>{{ extraLabel }}</th><th class="num">Sessions</th><th class="num">Absent</th><th class="num">Late</th><th class="num">Excused</th><th>Attendance</th></tr>
+              <tr><th>{{ groupLabel }}</th><th>{{ extraLabel }}</th><th class="num">{{ t('attendance.sessions') }}</th><th v-for="s in ATTENDANCE_STATUSES.slice(1)" :key="s.value" class="num">{{ s.label }}</th><th>{{ t('nav.attendance') }}</th></tr>
             </thead>
             <tbody>
               <tr v-for="r in report.rows" :key="r.key">
@@ -182,40 +183,40 @@ const regAbsent = (st) => Object.values(st.marks).filter((m) => m === 'absent').
               </tr>
             </tbody>
           </table>
-          <div v-if="!report.rows.length" class="empty"><AppIcon name="inbox" size="32" /><p>No attendance recorded for this selection.</p></div>
+          <div v-if="!report.rows.length" class="empty"><AppIcon name="inbox" size="32" /><p>{{ t('attendance.noData') }}</p></div>
         </div>
       </template>
 
       <!-- Day register -->
       <template v-if="tab === 'register'">
-        <div v-if="!f.class_id" class="empty"><AppIcon name="classes" size="32" /><p>Choose a class.</p></div>
+        <div v-if="!f.class_id" class="empty"><AppIcon name="classes" size="32" /><p>{{ t('attendance.chooseClass') }}</p></div>
         <div v-else-if="register" class="table-wrap" :class="{ 'is-loading': loading }">
           <table class="table register">
             <thead>
               <tr>
-                <th>Student</th>
+                <th>{{ t('common.student') }}</th>
                 <th v-for="c in register.columns" :key="`${c.slot_id}-${c.session_id}`" class="center">
                   <RouterLink v-if="c.slot_id" :to="`/attendance/${c.slot_id}/${register.date}`" class="reg-col">
                     <span class="mono">{{ c.start_time }}</span><span>{{ c.course_code }}</span>
                   </RouterLink>
                   <span v-else class="reg-col"><span class="mono">{{ c.start_time }}</span><span>{{ c.course_code }}</span></span>
                 </th>
-                <th class="num">Absent</th>
+                <th class="num">{{ t('attendance.absent') }}</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="st in register.students" :key="st.student_id">
                 <td><RouterLink :to="`/students/${st.student_id}`" class="strong">{{ st.last_name }} {{ st.first_name }}</RouterLink></td>
                 <td v-for="c in register.columns" :key="`${c.slot_id}-${c.session_id}`" class="center">
-                  <span v-if="markOf(st, c)" :class="['mark', markOf(st, c)]" :title="markOf(st, c)">{{ SHORT[markOf(st, c)] }}</span>
-                  <span v-else class="muted" :title="c.session_id ? 'Not marked' : 'Not taken'">·</span>
+                  <span v-if="markOf(st, c)" :class="['mark', markOf(st, c)]" :title="statusLabel(markOf(st, c))">{{ SHORT[markOf(st, c)] }}</span>
+                  <span v-else class="muted" :title="c.session_id ? t('attendance.notMarked') : t('attendance.notTaken')">·</span>
                 </td>
                 <td class="num" :class="{ 'text-danger': regAbsent(st) }">{{ regAbsent(st) }}</td>
               </tr>
             </tbody>
           </table>
-          <div v-if="!register.columns.length" class="empty"><AppIcon name="calendar" size="32" /><p>No class scheduled that day.</p></div>
-          <p v-else class="muted small reg-legend">P present · A absent · L late · E excused · “·” not taken yet</p>
+          <div v-if="!register.columns.length" class="empty"><AppIcon name="calendar" size="32" /><p>{{ t('attendance.noClassThatDay') }}</p></div>
+          <p v-else class="muted small reg-legend">{{ t('attendance.legend') }}</p>
         </div>
       </template>
     </div>

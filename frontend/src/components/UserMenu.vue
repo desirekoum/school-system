@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import AppIcon from './AppIcon.vue';
 import Avatar from './Avatar.vue';
 import { useAuth } from '../composables/useAuth';
+import { t } from '../i18n';
 
 // Profile button of the top bar with its dropdown: who is signed in, change password, sign out
 const { user, logout } = useAuth();
@@ -31,7 +32,7 @@ async function signOut() {
       <Avatar :name="user.full_name" :size="34" />
       <span class="user-meta">
         <span class="user-name">{{ user.full_name }}</span>
-        <span class="user-role">{{ user.role_label }}</span>
+        <span class="user-role">{{ t(`options.role.${user.role}`) }}</span>
       </span>
       <AppIcon name="chevronDown" size="16" class="user-chevron" />
     </button>
@@ -42,11 +43,11 @@ async function signOut() {
           <div>
             <p class="strong">{{ user.full_name }}</p>
             <p class="muted small mono">{{ user.username }}</p>
-            <span class="pill">{{ user.role_label }}</span>
+            <span class="pill">{{ t(`options.role.${user.role}`) }}</span>
           </div>
         </div>
-        <RouterLink to="/change-password" class="user-dropdown-item" role="menuitem"><AppIcon name="key" size="16" />Change password</RouterLink>
-        <button type="button" class="user-dropdown-item danger" role="menuitem" @click="signOut"><AppIcon name="logout" size="16" />Sign out</button>
+        <RouterLink to="/change-password" class="user-dropdown-item" role="menuitem"><AppIcon name="key" size="16" />{{ t('nav.changePassword') }}</RouterLink>
+        <button type="button" class="user-dropdown-item danger" role="menuitem" @click="signOut"><AppIcon name="logout" size="16" />{{ t('nav.signOut') }}</button>
       </div>
     </Transition>
   </div>

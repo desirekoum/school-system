@@ -4,6 +4,7 @@ import AppIcon from './AppIcon.vue';
 import Avatar from './Avatar.vue';
 import { classesApi } from '../api/http';
 import { PASS_MARK, scoreTone, fmt } from '../config/grading';
+import { t } from '../i18n';
 
 /** Grade entry for one class: pick an exam and a course, type the scores (/20), save the column. */
 const props = defineProps({
@@ -64,7 +65,7 @@ async function load() {
 let reverting = false;
 watch([examId, courseId], (now, before) => {
   if (reverting) { reverting = false; return; }
-  if (before && dirtyRows.value.length && !confirm('You have unsaved grades. Discard them?')) {
+  if (before && dirtyRows.value.length && !confirm(t('grades.discard'))) {
     reverting = true; // the revert below re-triggers this watcher: skip that run
     [examId.value, courseId.value] = before;
     return;
@@ -79,7 +80,7 @@ async function save() {
   try {
     const grades = dirtyRows.value.map((r) => ({ student_id: r.id, score: r.score === '' ? null : Number(r.score), comment: r.comment }));
     const res = await classesApi.saveGradebook(props.classId, { exam_id: examId.value, course_id: courseId.value, grades });
-    notice.value = `${res.saved} grade${res.saved === 1 ? '' : 's'} saved${res.deleted ? `, ${res.deleted} removed` : ''}.`;
+    notice.value = `${t('grades.saved', res.saved)}${res.deleted ? t('grades.removed', { n: res.deleted }) : ''}.`;
     rows.value.forEach((r) => (r.original = { score: asText(r.score), comment: r.comment ?? '' }));
     emit('saved');
   } catch (e) {
@@ -102,24 +103,28 @@ async function next(i) {
   <div class="card">
     <div class="toolbar">
       <div class="filters">
-        <select v-model="examId" aria-label="Exam">
+        <select v-model="examId" :aria-label="t('grades.exam')">
           <option v-for="e in exams" :key="e.id" :value="e.id">{{ e.label }}</option>
         </select>
-        <select v-model="courseId" aria-label="Course">
-          <option v-for="c in courses" :key="c.id" :value="c.id">{{ c.name }} (coef. {{ Number(c.coefficient) }})</option>
+        <select v-model="courseId" :aria-label="t('common.course')">
+          <option v-for="c in courses" :key="c.id" :value="c.id">{{ c.name }} ({{ t('grades.coef', { n: Number(c.coefficient) }) }})</option>
         </select>
       </div>
       <span v-if="stats" class="muted small">
-        {{ stats.count }}/{{ rows.length }} graded · average <b :class="scoreTone(stats.avg)">{{ fmt(stats.avg) }}</b> · {{ stats.pass }}% ≥ {{ PASS_MARK }}
+        <i18n-t keypath="grades.gradedStats" scope="global">
+          <template #count>{{ stats.count }}</template><template #total>{{ rows.length }}</template>
+          <template #avg><b :class="scoreTone(stats.avg)">{{ fmt(stats.avg) }}</b></template>
+          <template #pass>{{ stats.pass }}</template><template #mark>{{ PASS_MARK }}</template>
+        </i18n-t>
       </span>
     </div>
 
     <div v-if="error" class="alert" style="margin: 1rem 1.25rem 0"><AppIcon name="alert" />{{ error }}</div>
-    <div v-if="!courses.length" class="empty"><p>No course is assigned to this class yet. Assign courses in the Overview tab.</p></div>
+    <div v-if="!courses.length" class="empty"><p>{{ t('grades.noCourse') }}</p></div>
 
     <div v-else class="table-wrap" :class="{ 'is-loading': loading }">
       <table class="table">
-        <thead><tr><th>#</th><th>Student</th><th class="num">Score / 20</th><th>Comment</th></tr></thead>
+        <thead><tr><th>#</th><th>{{ t('common.student') }}</th><th class="num">{{ t('grades.score') }}</th><th>{{ t('grades.comment') }}</th></tr></thead>
         <tbody>
           <tr v-for="(r, i) in rows" :key="r.id">
             <td class="muted">{{ i + 1 }}</td>
@@ -132,24 +137,24 @@ async function next(i) {
             <td class="num">
               <input :ref="(el) => (inputs[i] = el)" v-model="r.score" type="number" min="0" max="20" step="0.25" inputmode="decimal"
                      class="grade-input" :class="{ invalid: !isValid(asText(r.score)), dirty: isDirty(r) }"
-                     :aria-label="`Score for ${r.name}`" @keydown.enter.prevent="next(i)" />
+                     :aria-label="t('grades.scoreFor', { name: r.name })" @keydown.enter.prevent="next(i)" />
             </td>
-            <td><input v-model="r.comment" class="comment-input" maxlength="200" placeholder="Optional" /></td>
+            <td><input v-model="r.comment" class="comment-input" maxlength="200" :placeholder="t('common.optional')" /></td>
           </tr>
         </tbody>
       </table>
-      <div v-if="!loading && !rows.length" class="empty"><p>No student registered in this class.</p></div>
+      <div v-if="!loading && !rows.length" class="empty"><p>{{ t('grades.noStudent') }}</p></div>
     </div>
 
     <div class="save-bar">
       <span class="muted small">
-        <template v-if="invalidCount"><b class="score-fail">{{ invalidCount }} invalid score{{ invalidCount > 1 ? 's' : '' }}</b>: use a number between 0 and 20.</template>
-        <template v-else-if="dirtyRows.length">{{ dirtyRows.length }} unsaved change{{ dirtyRows.length > 1 ? 's' : '' }}. Leave a score empty to remove it.</template>
+        <template v-if="invalidCount"><b class="score-fail">{{ t('grades.invalid', invalidCount) }}</b>{{ t('grades.invalidHelp') }}</template>
+        <template v-else-if="dirtyRows.length">{{ t('grades.unsaved', dirtyRows.length) }}</template>
         <template v-else-if="notice"><AppIcon name="check" size="14" /> {{ notice }}</template>
-        <template v-else>Tip: press Enter to move to the next student.</template>
+        <template v-else>{{ t('grades.tip') }}</template>
       </span>
       <button class="btn primary" :disabled="saving || !dirtyRows.length || invalidCount > 0" @click="save">
-        <AppIcon name="save" size="16" />{{ saving ? 'Saving…' : 'Save grades' }}
+        <AppIcon name="save" size="16" />{{ saving ? t('common.saving') : t('grades.saveGrades') }}
       </button>
     </div>
   </div>
