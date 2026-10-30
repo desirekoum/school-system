@@ -79,18 +79,7 @@ a { color: inherit; text-decoration: none; }
 .nav-link.active { background: rgba(255, 255, 255, .12); color: #fff; }
 .nav-link.active svg { color: var(--sidebar-accent); }
 .nav-link.active::before { content: ''; position: absolute; left: -1rem; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--sidebar-accent); }
-.sidebar-foot { margin-top: auto; padding: .75rem; border-radius: var(--radius-sm); background: rgba(255, 255, 255, .07); color: rgba(255, 255, 255, .65); font-size: .78rem; }
-/* The nav scrolls on short screens so the user box stays visible */
-.sidebar nav { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -.5rem .75rem -1rem; padding: 0 .5rem 0 1rem; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.2) transparent; }
-.sidebar-foot { flex: none; }
-.user-box { display: flex; align-items: center; gap: .6rem; margin-top: .7rem; padding-top: .7rem; border-top: 1px solid rgba(255, 255, 255, .1); }
-.user-box .avatar { background: rgba(127, 176, 255, .2); color: #fff; flex: none; }
-.user-meta { min-width: 0; }
-.user-name { color: #fff; font-weight: 600; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.user-role { color: var(--sidebar-accent); font-size: .75rem; }
-.user-actions { display: flex; gap: .25rem; margin-top: .6rem; }
-.user-actions a, .user-actions button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; padding: .4rem; border: 0; border-radius: 6px; background: rgba(255, 255, 255, .06); color: rgba(255, 255, 255, .8); font: inherit; font-size: .78rem; cursor: pointer; }
-.user-actions a:hover, .user-actions button:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+.sidebar nav { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -.5rem 0 -1rem; padding: 0 .5rem 0 1rem; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.2) transparent; }
 
 /* ============ Sign-in ============ */
 .auth-page { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem 1rem; background: radial-gradient(1200px 600px at 10% -10%, #163a7a 0%, transparent 60%), var(--sidebar-bg); }
@@ -118,7 +107,35 @@ a { color: inherit; text-decoration: none; }
 
 
 .main { flex: 1; min-width: 0; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-height: 100vh; }
-.topbar { display: none; }
+.topbar {
+  position: sticky; top: 0; z-index: 15; display: flex; align-items: center; gap: .75rem;
+  height: 60px; padding: 0 2rem; background: rgba(255, 255, 255, .92); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar .menu-btn, .topbar .mobile-brand { display: none; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
+.year-chip { display: inline-flex; align-items: center; gap: .45rem; padding: .4rem .75rem; border: 1px solid var(--border); border-radius: 999px; background: var(--gray-25); color: var(--muted); font-size: .82rem; white-space: nowrap; }
+.year-chip b { color: var(--text); font-weight: 600; }
+.year-chip svg { color: var(--primary); }
+a.year-chip:hover { border-color: var(--blue-200); background: var(--blue-50); }
+.user-menu { position: relative; }
+.user-trigger { display: flex; align-items: center; gap: .6rem; padding: .25rem .5rem .25rem .25rem; border: 1px solid transparent; border-radius: 999px; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.user-trigger:hover, .user-trigger[aria-expanded="true"] { background: var(--gray-50); border-color: var(--border); }
+.user-trigger .avatar { flex: none; }
+.user-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.user-name { font-weight: 600; font-size: .85rem; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-role { font-size: .75rem; color: var(--muted); }
+.user-chevron { color: var(--muted); transition: transform .15s; }
+.user-trigger[aria-expanded="true"] .user-chevron { transform: rotate(180deg); }
+.user-dropdown { position: absolute; right: 0; top: calc(100% + .5rem); width: 260px; padding: .4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-lg); }
+.user-dropdown-head { display: flex; gap: .75rem; align-items: flex-start; padding: .6rem .6rem .8rem; margin-bottom: .3rem; border-bottom: 1px solid var(--border); }
+.user-dropdown-head .pill { margin-top: .35rem; display: inline-block; }
+.user-dropdown-item { display: flex; width: 100%; align-items: center; gap: .6rem; padding: .55rem .6rem; border: 0; border-radius: var(--radius-sm); background: none; font: inherit; color: var(--gray-700); cursor: pointer; text-align: left; }
+.user-dropdown-item:hover { background: var(--gray-50); color: var(--text); }
+.user-dropdown-item.danger { color: var(--danger); }
+.user-dropdown-item.danger:hover { background: var(--danger-bg); }
+.pop-enter-active, .pop-leave-active { transition: opacity .12s, transform .12s; }
+.pop-enter-from, .pop-leave-to { opacity: 0; transform: translateY(-4px); }
 .content { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 2rem 2rem 3rem; }
 /* Footer stays at the bottom of short pages: .main is a column and .content takes the free space */
 .app-footer { padding: 1rem 2rem; border-top: 1px solid var(--border); text-align: center; color: var(--muted); font-size: .78rem; }
@@ -275,7 +292,12 @@ dl.info dd { margin: .15rem 0 0; font-weight: 500; white-space: pre-line; }
   .nav-open .sidebar { transform: none; box-shadow: var(--shadow-lg); }
   .nav-open .backdrop { display: block; position: fixed; inset: 0; z-index: 20; background: rgba(15, 27, 45, .35); }
   .main { margin-left: 0; }
-  .topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: .5rem; height: 56px; padding: 0 .75rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .topbar { height: 56px; padding: 0 .75rem; gap: .5rem; }
+  .topbar .menu-btn, .topbar .mobile-brand { display: inline-flex; }
+  .topbar-right { gap: .4rem; }
+  .year-label, .user-meta, .user-chevron { display: none; }
+  .year-chip { padding: .35rem .6rem; }
+  .user-trigger { padding: .2rem; }
   .mobile-brand { padding: 0; font-size: 1rem; }
   .mobile-brand img { height: 26px; }
   .content { padding: 1.25rem 1rem 2rem; }
