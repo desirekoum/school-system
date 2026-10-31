@@ -1,4 +1,4 @@
-import { query } from '../../db/pool.js';
+import { query, valuesList } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
 import { can } from '../auth/roles.js';
 import { tx } from '../finances/finances.service.js';
@@ -64,7 +64,7 @@ export async function daySessions({ date, class_id }, user) {
     LEFT JOIN attendance_sessions a ON a.slot_id = s.id AND a.date = $2
     WHERE s.academic_year = $1 AND s.weekday = $3
       AND ($4::int IS NULL OR s.class_id = $4) AND ($5::int IS NULL OR s.teacher_id = $5)
-    ORDER BY s.start_time, s.class_name`,
+    ORDER BY s.start_time, s.class_name, s.id`,
     [year.name, date, weekdayOf(date), class_id || null, own ? (user.teacher_id ?? 0) : null]);
   const outsideYear = date < year.start_date || date > year.end_date;
   return {
@@ -94,7 +94,7 @@ const ROSTER = `
   SELECT s.id AS student_id, s.matricule, s.first_name, s.last_name, s.photo_url
   FROM registrations r JOIN students s ON s.id = r.student_id
   WHERE r.class_id = $1 AND r.status <> 'cancelled'
-  ORDER BY s.last_name, s.first_name`;
+  ORDER BY s.last_name, s.first_name, s.id`;
 
 /** The call sheet of one slot on one date: students with their mark (none yet = not taken). */
 export async function getSheet(slotId, date, user) {
@@ -109,7 +109,7 @@ export async function getSheet(slotId, date, user) {
   const { rows: students } = await query(`
     SELECT ro.*, ar.status, ar.minutes_late, ar.note
     FROM (${ROSTER}) ro LEFT JOIN attendance_records ar ON ar.student_id = ro.student_id AND ar.session_id = $2
-    ORDER BY ro.last_name, ro.first_name`,
+    ORDER BY ro.last_name, ro.first_name, ro.student_id`,
   [slot.class_id, session?.id ?? 0]);
   return { slot, date, session: session ?? null, students, ...rights, open_before: OPEN_BEFORE, close_after: CLOSE_AFTER };
 }
@@ -144,19 +144,17 @@ export async function saveSheet(slotId, date, { records }, user) {
     if (missing.length) throw new HttpError(400, `Give a status for every student (${missing.length} missing, e.g. ${missing[0].last_name} ${missing[0].first_name})`);
 
     // Upsert the session (slot + date are unique), then replace its marks
-    const { rows: [session] } = await client.query(`
+    await client.query(`
       INSERT INTO attendance_sessions (slot_id, class_id, course_id, teacher_id, date, start_time, end_time, taken_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (slot_id, date) DO UPDATE SET updated_at = now(), taken_by = EXCLUDED.taken_by
-      RETURNING id`,
+      ON CONFLICT (slot_id, date) DO UPDATE SET updated_at = now(), taken_by = EXCLUDED.taken_by`,
     [slot.id, slot.class_id, slot.course_id, slot.teacher_id, date, slot.start_time, slot.end_time, user.id]);
+    const { rows: [session] } = await client.query('SELECT id FROM attendance_sessions WHERE slot_id = $1 AND date = $2', [slot.id, date]);
     await client.query('DELETE FROM attendance_records WHERE session_id = $1', [session.id]);
     const list = [...given];
-    // unnest() inserts every row in one statement instead of one query per student
-    await client.query(`
-      INSERT INTO attendance_records (session_id, student_id, status, minutes_late, note)
-      SELECT $1, * FROM unnest($2::int[], $3::attendance_status[], $4::smallint[], $5::varchar[])`,
-    [session.id, list.map(([id]) => id), list.map(([, v]) => v.status), list.map(([, v]) => v.minutes_late), list.map(([, v]) => v.note)]);
+    // One multi-row INSERT instead of one query per student
+    const marks = valuesList(list.map(([id, v]) => [session.id, id, v.status, v.minutes_late, v.note]));
+    await client.query(`INSERT INTO attendance_records (session_id, student_id, status, minutes_late, note) VALUES ${marks.sql}`, marks.params);
     return { session_id: session.id, saved: list.length };
   });
 }
@@ -228,12 +226,13 @@ export async function dayRegister({ class_id, date }, user) {
     WHERE a.class_id = $1 AND a.date = $2 AND a.slot_id IS NULL`, [class_id, date]);
   const columns = [...slots, ...orphans].sort((x, y) => x.start_time.localeCompare(y.start_time));
   const { rows: students } = await query(`
-    SELECT ro.*, COALESCE((
+    SELECT ro.*, (
       SELECT json_object_agg(ar.session_id, ar.status) FROM attendance_records ar
       JOIN attendance_sessions a ON a.id = ar.session_id
-      WHERE ar.student_id = ro.student_id AND a.class_id = $1 AND a.date = $2), '{}') AS marks
+      WHERE ar.student_id = ro.student_id AND a.class_id = $1 AND a.date = $2) AS marks
     FROM (${ROSTER}) ro
-    ORDER BY ro.last_name, ro.first_name`, [class_id, date]);
+    ORDER BY ro.last_name, ro.first_name, ro.student_id`, [class_id, date]);
+  students.forEach((s) => { s.marks ??= {}; });
   return { class_id: Number(class_id), date, columns, students };
 }
 

@@ -1,4 +1,4 @@
-import { pool, query } from '../../db/pool.js';
+import { pool, query, valuesList } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
 
 export const PASS_MARK = 10; // out of 20
@@ -69,13 +69,11 @@ export async function saveGradebook(classId, { exam_id, course_id, grades = [] }
   try {
     await client.query('BEGIN');
     if (toSave.length) {
+      const rows = valuesList(toSave.map((g) => [exam_id, classId, course_id, g.student_id, g.score, g.comment]));
       await client.query(`
-        INSERT INTO grades (exam_id, class_id, course_id, student_id, score, comment)
-        SELECT $1, $2, $3, u.student_id, u.score, u.comment
-        FROM unnest($4::int[], $5::numeric[], $6::text[]) AS u(student_id, score, comment)
+        INSERT INTO grades (exam_id, class_id, course_id, student_id, score, comment) VALUES ${rows.sql}
         ON CONFLICT (exam_id, course_id, student_id)
-        DO UPDATE SET score = EXCLUDED.score, comment = EXCLUDED.comment, class_id = EXCLUDED.class_id, updated_at = now()`,
-        [exam_id, classId, course_id, toSave.map((g) => g.student_id), toSave.map((g) => g.score), toSave.map((g) => g.comment)]);
+        DO UPDATE SET score = EXCLUDED.score, comment = EXCLUDED.comment, class_id = EXCLUDED.class_id, updated_at = now()`, rows.params);
     }
     if (toDelete.length) {
       await client.query('DELETE FROM grades WHERE exam_id = $1 AND course_id = $2 AND student_id = ANY($3::int[])',
@@ -124,11 +122,12 @@ export async function classResults(classId, trimester = null) {
     )
     SELECT ro.*, round(g.avg, 2)::float AS general_avg,
       CASE WHEN g.avg IS NOT NULL THEN RANK() OVER (ORDER BY g.avg DESC NULLS LAST) END::int AS rank,
-      COALESCE((SELECT json_object_agg(ca.course_id, round(ca.avg, 2)) FROM course_avgs ca WHERE ca.student_id = ro.id), '{}') AS course_avgs
+      (SELECT json_object_agg(ca.course_id, round(ca.avg, 2)) FROM course_avgs ca WHERE ca.student_id = ro.id) AS course_avgs
     FROM (${ROSTER}) ro
     LEFT JOIN general g ON g.student_id = ro.id
     ORDER BY g.avg DESC NULLS LAST, ro.last_name, ro.first_name`, [classId, cls.academic_year, trimester]);
 
+  students.forEach((s) => { s.course_avgs ??= {}; });
   const graded = students.filter((s) => s.general_avg !== null).map((s) => s.general_avg);
   const stats = {
     students: students.length,
@@ -161,7 +160,7 @@ export async function reportCard(studentId, yearName) {
     WHERE ay.name = $1 ORDER BY t.number, e.number`, [reg.academic_year]);
 
   const { rows: grades } = await query(
-    'SELECT exam_id, course_id, score::float FROM grades WHERE student_id = $1 AND class_id = $2', [studentId, reg.class_id]);
+    'SELECT exam_id, course_id, score::float AS score FROM grades WHERE student_id = $1 AND class_id = $2', [studentId, reg.class_id]);
 
   // Class results per period give the averages and the rank in one place
   const periods = await Promise.all([1, 2, 3, null].map((t) => classResults(reg.class_id, t)));

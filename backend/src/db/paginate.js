@@ -87,6 +87,6 @@ export async function paginatedWithSum(q, opts, sumSql) {
 /** Full (unpaginated) filtered list, e.g. for CSV export. */
 export async function fullList(q, opts) {
   const { where, params } = buildWhere(q, opts, [...(opts.baseParams ?? [])]);
-  const { rows } = await query(`SELECT * FROM (${opts.baseSql}) t ${where} ORDER BY ${opts.orderBy}`, params);
+  const { rows } = await query(`SELECT * FROM (${opts.baseSql}) t ${where} ORDER BY ${opts.orderBy}, t.id`, params);
   return rows;
 }

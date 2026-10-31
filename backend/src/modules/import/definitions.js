@@ -251,14 +251,17 @@ export const DEFINITIONS = {
       if (data.is_primary) {
         await client.query('UPDATE student_guardians SET is_primary = false WHERE student_id = $1 AND guardian_id <> $2 AND is_primary', [student, guardian]);
       }
-      const { rows: [link] } = await client.query(`
-        INSERT INTO student_guardians (student_id, guardian_id, relation, is_primary) VALUES ($1, $2, coalesce($3, 'guardian'), coalesce($4, false))
-        ON CONFLICT (student_id, guardian_id) DO UPDATE
-          SET relation = coalesce($3, student_guardians.relation), is_primary = coalesce($4, student_guardians.is_primary)
-          WHERE student_guardians.relation IS DISTINCT FROM coalesce($3, student_guardians.relation)
-             OR student_guardians.is_primary IS DISTINCT FROM coalesce($4, student_guardians.is_primary)
-        RETURNING (xmax = 0) AS inserted`, [student, guardian, data.relation ?? null, data.is_primary ?? null]);
-      if (result === 'unchanged' && link) result = link.inserted ? 'created' : 'updated';
+      const { rows: [link] } = await client.query(
+        'SELECT relation, is_primary FROM student_guardians WHERE student_id = $1 AND guardian_id = $2 FOR UPDATE', [student, guardian]);
+      const relation = data.relation ?? link?.relation ?? 'guardian';
+      const isPrimary = data.is_primary ?? link?.is_primary ?? false;
+      if (!link) {
+        await client.query('INSERT INTO student_guardians (student_id, guardian_id, relation, is_primary) VALUES ($1, $2, $3, $4)', [student, guardian, relation, isPrimary]);
+        if (result === 'unchanged') result = 'created';
+      } else if (link.relation !== relation || link.is_primary !== isPrimary) {
+        await client.query('UPDATE student_guardians SET relation = $3, is_primary = $4 WHERE student_id = $1 AND guardian_id = $2', [student, guardian, relation, isPrimary]);
+        if (result === 'unchanged') result = 'updated';
+      }
       return result;
     },
   },
@@ -302,12 +305,14 @@ export const DEFINITIONS = {
       const { rows: [course] } = await client.query('SELECT id FROM courses WHERE upper(code) = upper($1)', [data.course_code]);
       if (!course) throw new RowError('Course code', `no course with code ${data.course_code}`);
       const teacher = await teacherId(client, data.teacher, 'Teacher');
-      const { rows: [row] } = await client.query(`
-        INSERT INTO class_courses (class_id, course_id, teacher_id) VALUES ($1, $2, $3)
-        ON CONFLICT (class_id, course_id) DO UPDATE SET teacher_id = coalesce($3, class_courses.teacher_id)
-          WHERE class_courses.teacher_id IS DISTINCT FROM coalesce($3, class_courses.teacher_id)
-        RETURNING (xmax = 0) AS inserted`, [cls.id, course.id, teacher ?? null]);
-      return !row ? 'unchanged' : row.inserted ? 'created' : 'updated';
+      const { rows: [row] } = await client.query('SELECT teacher_id FROM class_courses WHERE class_id = $1 AND course_id = $2 FOR UPDATE', [cls.id, course.id]);
+      if (!row) {
+        await client.query('INSERT INTO class_courses (class_id, course_id, teacher_id) VALUES ($1, $2, $3)', [cls.id, course.id, teacher ?? null]);
+        return 'created';
+      }
+      if (teacher == null || row.teacher_id === teacher) return 'unchanged';
+      await client.query('UPDATE class_courses SET teacher_id = $3 WHERE class_id = $1 AND course_id = $2', [cls.id, course.id, teacher]);
+      return 'updated';
     },
   },
   items: {

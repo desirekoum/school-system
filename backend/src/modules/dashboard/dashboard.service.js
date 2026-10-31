@@ -1,4 +1,5 @@
 import { query } from '../../db/pool.js';
+import { monthSeries } from '../../db/series.js';
 import { can, ROLES } from '../auth/roles.js';
 import { schoolNow } from '../timetable/timetable.service.js';
 import { daySessions, summary, CLOSE_AFTER } from '../attendance/attendance.service.js';
@@ -104,6 +105,23 @@ async function attendance({ user, year, today, d30, d60, d31 }, office) {
 }
 
 // ---------- Finance ----------
+// Tuition received per month of the academic year, from the first payment (registrations are often paid
+// before the school year starts) to today; months with no payment are filled in JS
+async function tuitionByMonth(year, today) {
+  const [ay, rows] = await Promise.all([
+    one('SELECT start_date, end_date FROM academic_years WHERE name = $1', [year]),
+    all(`
+      SELECT to_char(p.paid_at, 'YYYY-MM') AS month, SUM(p.amount)::int AS amount
+      FROM payments p JOIN registrations r ON r.id = p.registration_id
+      WHERE p.voided_at IS NULL AND r.academic_year = $1
+      GROUP BY 1 ORDER BY 1`, [year]),
+  ]);
+  if (!ay) return [];
+  const byMonth = new Map(rows.map((r) => [r.month, r.amount]));
+  const first = [rows[0]?.month, ay.start_date.slice(0, 7)].filter(Boolean).sort()[0];
+  const last = (today < ay.end_date ? today : ay.end_date).slice(0, 7);
+  return monthSeries(first, last).filter((m) => m <= last).map((month) => ({ month, amount: byMonth.get(month) ?? 0 }));
+}
 async function finance({ year, today, d30, d60, d31 }) {
   const [totals, months, debtors, last] = await Promise.all([
     one(`
@@ -111,24 +129,13 @@ async function finance({ year, today, d30, d60, d31 }) {
              COALESCE(SUM(rb.balance), 0)::bigint::float AS outstanding
       FROM registrations r JOIN registration_balances rb ON rb.registration_id = r.id
       WHERE r.academic_year = $1 AND r.status <> 'cancelled'`, [year]),
-    // Tuition received per month of the academic year; generate_series fills the months with no payment
-    all(`
-      SELECT to_char(m, 'YYYY-MM') AS month, COALESCE(SUM(p.amount), 0)::int AS amount
-      FROM academic_years ay
-      -- From the first payment of the year (registrations are often paid before the school year starts)
-      CROSS JOIN generate_series(
-        date_trunc('month', LEAST(ay.start_date, (SELECT MIN(p2.paid_at) FROM payments p2 JOIN registrations r2 ON r2.id = p2.registration_id
-                                                   WHERE r2.academic_year = $1 AND p2.voided_at IS NULL))),
-        date_trunc('month', LEAST(ay.end_date, $2::date)), interval '1 month') m
-      LEFT JOIN payments p ON p.voided_at IS NULL AND date_trunc('month', p.paid_at) = m
-        AND EXISTS (SELECT 1 FROM registrations r WHERE r.id = p.registration_id AND r.academic_year = $1)
-      WHERE ay.name = $1 GROUP BY m ORDER BY m`, [year, today]),
+    tuitionByMonth(year, today),
     all(`
       SELECT r.id AS registration_id, s.first_name || ' ' || s.last_name AS student, c.name AS class_name, rb.balance
       FROM registrations r JOIN students s ON s.id = r.student_id JOIN classes c ON c.id = r.class_id
       JOIN registration_balances rb ON rb.registration_id = r.id
       WHERE r.academic_year = $1 AND r.status <> 'cancelled' AND rb.balance > 0
-      ORDER BY rb.balance DESC LIMIT 5`, [year]),
+      ORDER BY rb.balance DESC, rb.registration_id LIMIT 5`, [year]),
     one(`
       SELECT COALESCE(SUM(amount) FILTER (WHERE paid_at BETWEEN $2 AND $1), 0)::int AS last_30,
              COALESCE(SUM(amount) FILTER (WHERE paid_at BETWEEN $3 AND $4), 0)::int AS prev_30
@@ -203,7 +210,7 @@ async function registrations({ year, today }) {
     one(`
       SELECT count(*) FILTER (WHERE status = 'pending')::int AS pending,
              count(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
-             count(*) FILTER (WHERE registered_at::date > $2::date - 7)::int AS this_week
+             count(*) FILTER (WHERE registered_at::date > $2::date - interval '7 days')::int AS this_week
       FROM registrations WHERE academic_year = $1`, [year, today]),
     all(`
       SELECT r.id, r.student_id, r.status, r.registered_at, s.first_name || ' ' || s.last_name AS student, c.name AS class_name
@@ -254,5 +261,7 @@ async function alerts({ user, now, year, today }, office) {
       .then((r) => add(r.n, { kind: 'registrations', tone: 'info', label: 'registrations awaiting payment', to: '/registrations' })));
   }
   await Promise.all(jobs);
-  return list;
+  // The queries finish in any order: most urgent first, then a fixed order
+  const rank = { danger: 0, warning: 1, info: 2 };
+  return list.sort((a, b) => (rank[a.tone] ?? 3) - (rank[b.tone] ?? 3) || a.kind.localeCompare(b.kind));
 }

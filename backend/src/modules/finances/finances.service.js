@@ -1,5 +1,6 @@
-import { pool, query } from '../../db/pool.js';
+import { pool, query, valuesList } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
+import { monthSeries } from '../../db/series.js';
 
 export const METHODS = ['cash', 'mobile_money', 'bank_transfer', 'cheque'];
 export const MAX_INSTALMENTS = 6;
@@ -40,11 +41,11 @@ async function lockRegistration(client, id) {
  * Cancelled registrations are left alone.
  */
 export async function syncStatus(client, registrationId) {
-  await client.query(`
-    UPDATE registrations r
-    SET status = (CASE WHEN rb.confirmable THEN 'confirmed' ELSE 'pending' END)::registration_status
-    FROM registration_balances rb
-    WHERE rb.registration_id = r.id AND r.id = $1 AND r.status <> 'cancelled'`, [registrationId]);
+  // Read, then write (UPDATE … FROM is PostgreSQL-only, and MySQL can't update a table its view reads)
+  const { rows: [b] } = await client.query('SELECT confirmable FROM registration_balances WHERE registration_id = $1', [registrationId]);
+  if (!b) return;
+  await client.query("UPDATE registrations SET status = $2 WHERE id = $1 AND status <> 'cancelled'",
+    [registrationId, b.confirmable ? 'confirmed' : 'pending']);
 }
 
 // ---------- Payments ----------
@@ -135,16 +136,14 @@ export async function requestPlan(client, registrationId, { instalments, reason 
   if (reg.balance <= 0) throw new HttpError(409, 'Tuition already fully paid');
   validateInstalments(instalments, reg.tuition_fee);
 
-  const { rows: [plan] } = await client.query(`
-    INSERT INTO instalment_plans (registration_id, reason) VALUES ($1, $2)
-    ON CONFLICT (registration_id) DO UPDATE SET status = 'requested', reason = EXCLUDED.reason, requested_at = now(), decided_at = NULL
-    RETURNING *`, [registrationId, reason || null]);
-  await client.query('DELETE FROM instalments WHERE plan_id = $1', [plan.id]);
   await client.query(`
-    INSERT INTO instalments (plan_id, number, due_date, amount)
-    SELECT $1, u.ord, u.due_date, u.amount
-    FROM unnest($2::date[], $3::int[]) WITH ORDINALITY AS u(due_date, amount, ord)`,
-    [plan.id, instalments.map((i) => i.due_date), instalments.map((i) => Number(i.amount))]);
+    INSERT INTO instalment_plans (registration_id, reason) VALUES ($1, $2)
+    ON CONFLICT (registration_id) DO UPDATE SET status = 'requested', reason = EXCLUDED.reason, requested_at = now(), decided_at = NULL`,
+    [registrationId, reason || null]);
+  const { rows: [plan] } = await client.query('SELECT * FROM instalment_plans WHERE registration_id = $1', [registrationId]);
+  await client.query('DELETE FROM instalments WHERE plan_id = $1', [plan.id]);
+  const parts = valuesList(instalments.map((i, n) => [plan.id, n + 1, i.due_date, Number(i.amount)]));
+  await client.query(`INSERT INTO instalments (plan_id, number, due_date, amount) VALUES ${parts.sql}`, parts.params);
   // A changed plan goes back to "requested": it no longer confirms the registration until approved again
   await syncStatus(client, registrationId);
   return plan;
@@ -214,6 +213,33 @@ export async function account(registrationId) {
 // ---------- Reports ----------
 
 /** Financial report of an academic year: tuition, sales, expenses, cash flow per month, debtors. */
+// Money in and out per month of the year, from the first movement (or the year start) to today (or the year end)
+async function cashFlow(academicYear, LIVE_PAYMENTS) {
+  const [{ rows: [ay] }, { rows }] = await Promise.all([
+    query('SELECT start_date, end_date FROM academic_years WHERE name = $1', [academicYear]),
+    query(`
+      WITH moves AS (
+        SELECT paid_at AS day, amount, 'tuition' AS kind FROM (${LIVE_PAYMENTS}) p
+        UNION ALL
+        SELECT s.sold_at, st.total, 'sales' FROM sales s JOIN sale_totals st ON st.sale_id = s.id
+        WHERE s.voided_at IS NULL AND s.academic_year = $1
+        UNION ALL
+        SELECT e.spent_at, e.amount, 'expenses' FROM expenses e WHERE e.voided_at IS NULL AND e.academic_year = $1
+      )
+      SELECT to_char(m.day, 'YYYY-MM') AS month,
+             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'tuition'), 0)::int AS tuition,
+             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'sales'), 0)::int AS sales,
+             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'expenses'), 0)::int AS expenses
+      FROM moves m GROUP BY 1 ORDER BY 1`, [academicYear]),
+  ]);
+  if (!ay) return { rows: [] };
+  const today = new Date().toISOString().slice(0, 10);
+  const byMonth = new Map(rows.map((r) => [r.month, r]));
+  const first = [rows[0]?.month, ay.start_date.slice(0, 7)].filter(Boolean).sort()[0];
+  const last = [rows.at(-1)?.month, (today < ay.end_date ? today : ay.end_date).slice(0, 7)].filter(Boolean).sort().at(-1);
+  return { rows: monthSeries(first, last).map((month) => byMonth.get(month) ?? { month, tuition: 0, sales: 0, expenses: 0 }) };
+}
+
 export async function report(academicYear) {
   if (!academicYear) {
     const { rows: [y] } = await query('SELECT name FROM academic_years ORDER BY is_current DESC, name DESC LIMIT 1');
@@ -253,30 +279,9 @@ export async function report(academicYear) {
       GROUP BY c.id ORDER BY c.name`, [academicYear]),
     query(`SELECT method, count(*)::int AS count, SUM(amount)::int AS total
            FROM (${LIVE_PAYMENTS}) p GROUP BY method ORDER BY total DESC`, [academicYear]),
-    // Cash flow per month. Every money movement of the year becomes one row (UNION ALL),
-    // and generate_series fills months with no movement so the chart has no gaps.
-    query(`
-      WITH moves AS (
-        SELECT paid_at AS day, amount, 'tuition' AS kind FROM (${LIVE_PAYMENTS}) p
-        UNION ALL
-        SELECT s.sold_at, st.total, 'sales' FROM sales s JOIN sale_totals st ON st.sale_id = s.id
-        WHERE s.voided_at IS NULL AND s.academic_year = $1
-        UNION ALL
-        SELECT e.spent_at, e.amount, 'expenses' FROM expenses e WHERE e.voided_at IS NULL AND e.academic_year = $1
-      ),
-      bounds AS (
-        SELECT date_trunc('month', LEAST(MIN(m.day), ay.start_date))::date AS first,
-               date_trunc('month', GREATEST(MAX(m.day), LEAST(current_date, ay.end_date)))::date AS last
-        FROM academic_years ay LEFT JOIN moves m ON true
-        WHERE ay.name = $1 GROUP BY ay.start_date, ay.end_date
-      )
-      SELECT to_char(mo, 'YYYY-MM') AS month,
-             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'tuition'), 0)::int AS tuition,
-             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'sales'), 0)::int AS sales,
-             COALESCE(SUM(m.amount) FILTER (WHERE m.kind = 'expenses'), 0)::int AS expenses
-      FROM bounds, generate_series(bounds.first, bounds.last, interval '1 month') AS mo
-      LEFT JOIN moves m ON date_trunc('month', m.day) = mo
-      GROUP BY mo ORDER BY mo`, [academicYear]),
+    // Cash flow per month. Every money movement of the year becomes one row (UNION ALL);
+    // months with no movement are filled in JS so the chart has no gaps.
+    cashFlow(academicYear, LIVE_PAYMENTS),
     query(`SELECT id, student, matricule, class_name, fee, paid, balance, overdue, next_due_date, plan_status
            FROM (${ACTIVE}) t WHERE balance > 0
            ORDER BY overdue DESC, balance DESC, student LIMIT 20`, [academicYear]),

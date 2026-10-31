@@ -3,7 +3,8 @@ export class HttpError extends Error {
 }
 
 // Maps PostgreSQL error codes to HTTP statuses
-const PG_ERRORS = { '23502': [400, 'Required value missing'], '23505': [409, 'Already exists'], '23503': [409, 'Referenced record missing or in use'], '23514': [400, 'Invalid value'], '22P02': [400, 'Invalid input'] };
+const PG_ERRORS = { '23502': [400, 'Required value missing'], '23505': [409, 'Already exists'], '23503': [409, 'Referenced record missing or in use'], '23514': [400, 'Invalid value'], '22P02': [400, 'Invalid input'],
+  '22007': [400, 'Invalid input'], '22008': [400, 'Invalid input'] }; // invalid / out-of-range date
 
 export function errorHandler(err, req, res, _next) {
   if (err.status) return res.status(err.status).json({ error: err.message });
