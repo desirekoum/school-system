@@ -49,10 +49,10 @@ router.get('/:id/courses', async (req, res) => {
 router.post('/:id/courses', async (req, res) => {
   const { course_id, teacher_id = null } = req.body;
   if (!course_id) throw new HttpError(400, 'Missing: course_id');
-  const { rows } = await query(`
+  await query(`
     INSERT INTO class_courses (class_id, course_id, teacher_id) VALUES ($1, $2, $3)
-    ON CONFLICT (class_id, course_id) DO UPDATE SET teacher_id = EXCLUDED.teacher_id
-    RETURNING *`, [req.params.id, course_id, teacher_id]);
+    ON CONFLICT (class_id, course_id) DO UPDATE SET teacher_id = EXCLUDED.teacher_id`, [req.params.id, course_id, teacher_id]);
+  const { rows } = await query('SELECT * FROM class_courses WHERE class_id = $1 AND course_id = $2', [req.params.id, course_id]);
   res.status(201).json(rows[0]);
 });
 

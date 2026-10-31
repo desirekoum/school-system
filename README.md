@@ -1,6 +1,6 @@
 # SchoolDoc
 
-School management system. **Stack:** Node + Express 5 · PostgreSQL · Vue 3 + Vite.
+School management system. **Stack:** Node + Express 5 · PostgreSQL or MySQL 8 · Vue 3 + Vite.
 
 Modules (v0.1): students, registrations, teachers, classes, courses.
 
@@ -71,6 +71,23 @@ npm run create-admin -- admin you@school.cm "Your Name"   # first account: print
 npm run dev                                               # https://localhost:3000
 cd ../frontend && npm i && npm run dev                    # https://localhost:5173 (proxies /api over HTTPS)
 ```
+
+### On MySQL instead of PostgreSQL
+
+The same code runs on **MySQL 8.0.23+**: the `DATABASE_URL` scheme picks the engine.
+
+```bash
+mysql -u root -p -e "CREATE DATABASE schooldoc CHARACTER SET utf8mb4"
+# backend/.env
+DATABASE_URL=mysql://user:password@localhost:3306/schooldoc
+npm run migrate      # runs src/db/migrations/mysql/*.sql
+```
+
+How it works: the queries stay written for PostgreSQL and `src/db/mysql.js` translates them on the fly
+(`$1` → `?`, `::int` → `CAST`, `FILTER`, `ILIKE`, `ON CONFLICT`, `RETURNING`...), types the results like
+node-postgres does (booleans, dates) and maps MySQL errors to the same PostgreSQL codes, so the API answers the same.
+Known differences: MySQL sorts and searches without accents (`É` sorts with `E`, "elo" finds "Éloïse"), and a
+non-numeric id in a URL gives 404 instead of 400.
 
 Open https://localhost:5173 and sign in. In development, email and SMS codes are printed in the API console
 until `SMTP_*` / `SMS_*` are set in `.env`. Users, roles and the security design are described in

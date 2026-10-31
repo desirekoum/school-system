@@ -12,7 +12,8 @@
  * Uses a seeded random generator, so every run produces the same data set
  * (payments dated after today are simply not recorded yet).
  */
-import { pool } from './pool.js';
+import { pool, isMySQL } from './pool.js';
+import { schoolNow } from '../modules/timetable/timetable.service.js';
 import { splitInTrimesters } from '../modules/academic-years/academic-years.service.js';
 import { hashPassword } from '../modules/auth/crypto.js';
 
@@ -193,6 +194,12 @@ async function insertMany(client, table, rows, returning = 'id') {
   return out;
 }
 
+/** Next receipt/voucher number = n + 1 (a sequence in PostgreSQL, a counter row in MySQL). */
+async function setCounter(client, name, n) {
+  if (isMySQL) await client.query('UPDATE receipt_counters SET value = $2 WHERE name = $1', [name, n]);
+  else await client.query('SELECT setval($1, $2, $3)', [`${name}_seq`, n || 1, n > 0]);
+}
+
 async function populate() {
   const client = await pool.connect();
   try {
@@ -203,12 +210,21 @@ async function populate() {
       return;
     }
 
-    await client.query('BEGIN');
     if (RESET) {
-      // RESTART IDENTITY resets SERIAL counters; CASCADE empties dependent tables too
-      await client.query(`TRUNCATE attendance_records, attendance_sessions, timetable_slots, auth_events, sessions, auth_challenges, users, sale_items, sales, expenses, items, payments, instalments, instalment_plans, grades, exams, trimesters, registrations, class_courses, student_guardians, guardians,
-                          classes, academic_years, courses, students, teachers RESTART IDENTITY CASCADE`);
+      const tables = ['attendance_records', 'attendance_sessions', 'timetable_slots', 'auth_events', 'sessions', 'auth_challenges', 'users',
+        'sale_items', 'sales', 'expenses', 'items', 'payments', 'instalments', 'instalment_plans', 'grades', 'exams', 'trimesters',
+        'registrations', 'class_courses', 'student_guardians', 'guardians', 'classes', 'academic_years', 'courses', 'students', 'teachers'];
+      if (isMySQL) {
+        // MySQL: TRUNCATE takes one table, commits implicitly and refuses FK-referenced tables unless checks are off
+        await client.query('SET FOREIGN_KEY_CHECKS = 0');
+        for (const t of tables) await client.query(`TRUNCATE ${t}`);
+        await client.query('SET FOREIGN_KEY_CHECKS = 1');
+      } else {
+        // RESTART IDENTITY resets SERIAL counters; CASCADE empties dependent tables too
+        await client.query(`TRUNCATE ${tables.join(', ')} RESTART IDENTITY CASCADE`);
+      }
     }
+    await client.query('BEGIN');
 
     // --- Teachers: enough to cover every course in every class ---
     const SPECIALTY_COUNT = { 'Mathématiques': 8, 'Lettres modernes': 8, 'Anglais': 6, 'Histoire-Géographie': 6, 'SVT': 5, 'Physique-Chimie': 5,
@@ -251,10 +267,13 @@ async function populate() {
     const courseIds = (await insertMany(client, 'courses', courseRows)).map((r) => r.id);
 
     // --- Academic year: 3 trimesters × 2 exams (exam dates near the end of each half-trimester) ---
-    const { rows: [year] } = await client.query(
+    // Only one current year: clear the flag first, then insert or flag the demo year
+    await client.query('UPDATE academic_years SET is_current = false WHERE is_current');
+    await client.query(
       `INSERT INTO academic_years (name, start_date, end_date, is_current) VALUES ($1, $2, $3, true)
-       ON CONFLICT (name) DO UPDATE SET is_current = true RETURNING id`,
+       ON CONFLICT (name) DO UPDATE SET is_current = true`,
       [ACADEMIC_YEAR, `${START_YEAR}-09-01`, `${START_YEAR + 1}-06-30`]);
+    const { rows: [year] } = await client.query('SELECT id FROM academic_years WHERE name = $1', [ACADEMIC_YEAR]);
     await client.query('UPDATE academic_years SET is_current = (id = $1)', [year.id]);
     await client.query('DELETE FROM trimesters WHERE academic_year_id = $1', [year.id]);
     const examIds = [];
@@ -470,7 +489,7 @@ async function populate() {
       voided_at: p.voided_at ?? null,
       void_reason: p.void_reason ?? null,
     })), null);
-    await client.query('SELECT setval($1, $2)', ['receipt_seq', payRows.length || 1]);
+    await setCounter(client, 'receipt', payRows.length);
 
     // --- Grades on /20 for every exam of the year: each student has a base level,
     //     a strength/weakness per course, and some noise per exam ---
@@ -576,7 +595,7 @@ async function populate() {
     })))).map((r) => r.id);
     await insertMany(client, 'sale_items', saleRows.flatMap((x, n) =>
       x.lines.map(([k, quantity]) => ({ sale_id: saleIds[n], item_id: itemIds[k], quantity, unit_price: ITEMS[k][3] }))), null);
-    await client.query('SELECT setval($1, $2)', ['sale_seq', saleRows.length || 1]);
+    await setCounter(client, 'sale', saleRows.length);
 
     // --- Running costs of the year ---
     const monthsSoFar = [];
@@ -610,10 +629,9 @@ async function populate() {
       reference: e.method === 'cash' ? null : e.method === 'cheque' ? `CHQ ${int(1000000, 9999999)}` : `VIR-${int(100000, 999999)}`,
       ...e,
     })), null);
-    await client.query('SELECT setval($1, $2)', ['expense_seq', expRows.length || 1]);
+    await setCounter(client, 'expense', expRows.length);
     // Final stock = purchases − sales, computed above while simulating the year
-    await client.query(`UPDATE items i SET stock = u.stock FROM unnest($1::int[], $2::int[]) AS u(id, stock) WHERE i.id = u.id`,
-      [itemIds, stock.map((x) => x ?? null)]);
+    for (const [k, id] of itemIds.entries()) await client.query('UPDATE items SET stock = $2 WHERE id = $1', [id, stock[k] ?? null]);
 
     // --- Demo accounts: one per role. Codes are printed in the API console until SMTP/SMS are configured ---
     const DEMO_PASSWORD = 'SchoolDoc2026';
@@ -658,7 +676,7 @@ async function populate() {
     const absentee = Object.fromEntries(studentIds.map((id) => [id, chance(0.1) ? 4 : 1]));
     let sessionCount = 0, recordCount = 0;
     // School time now: today's classes that are already over are taken too, the others are left to the teachers
-    const { rows: [clock] } = await client.query("SELECT to_char(now() AT TIME ZONE $1, 'HH24:MI') AS t", [process.env.SCHOOL_TZ ?? 'Africa/Douala']);
+    const clock = { t: (await schoolNow()).time };
     for (let back = 14; back >= 0; back--) {
       const date = new Date(Date.parse(nowIso) - back * 86400000).toISOString().slice(0, 10);
       const weekday = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
@@ -669,17 +687,16 @@ async function populate() {
         slot_id: sl.id, class_id: sl.class_id, course_id: sl.course_id, teacher_id: teacherOf[`${sl.class_id}:${sl.course_id}`],
         date, start_time: sl.start_time, end_time: sl.end_time,
       })), 'id, class_id');
-      const ids = [], students = [], statuses = [], lates = [];
+      const records = [];
       for (const se of sessions) {
         for (const sid of rosterOf[se.class_id] ?? []) {
           const k = absentee[sid];
           const st = weighted([['present', 100 - 7 * k], ['absent', 4 * k], ['late', 2 * k], ['excused', k]]);
-          ids.push(se.id); students.push(sid); statuses.push(st); lates.push(st === 'late' ? int(5, 25) : null);
+          records.push({ session_id: se.id, student_id: sid, status: st, minutes_late: st === 'late' ? int(5, 25) : null });
         }
       }
-      await client.query(`INSERT INTO attendance_records (session_id, student_id, status, minutes_late)
-        SELECT * FROM unnest($1::int[], $2::int[], $3::attendance_status[], $4::smallint[])`, [ids, students, statuses, lates]);
-      sessionCount += sessions.length; recordCount += ids.length;
+      await insertMany(client, 'attendance_records', records, null);
+      sessionCount += sessions.length; recordCount += records.length;
     }
 
     const hash = await hashPassword(DEMO_PASSWORD);
