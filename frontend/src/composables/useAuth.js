@@ -18,8 +18,13 @@ export function useAuth() {
   const setUser = (u) => { user.value = u; loading = Promise.resolve(u); };
   // An array means "any of these" (e.g. attendance: teachers take it, the office reads it)
   const can = (perm) => [].concat(perm).some((p) => !!user.value?.permissions.includes(p));
+  // Teacher accounts (teacher, homeroom teacher) only act on their own courses / class
+  const isTeaching = computed(() => ['teacher', 'homeroom'].includes(user.value?.role));
+  // Printing a class's report cards: principal and office for any class, a homeroom teacher for their own class
+  const canPrintCards = (homeroomTeacherId) =>
+    can('report-cards:print') && (!isTeaching.value || (!!homeroomTeacherId && homeroomTeacherId === user.value.teacher_id));
   async function logout() {
     try { await authApi.logout(); } finally { setUser(null); }
   }
-  return { user, signedIn: computed(() => !!user.value), fetchMe, setUser, can, logout };
+  return { user, signedIn: computed(() => !!user.value), fetchMe, setUser, can, isTeaching, canPrintCards, logout };
 }

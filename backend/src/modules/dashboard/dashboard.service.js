@@ -1,5 +1,5 @@
 import { query } from '../../db/pool.js';
-import { can, ROLES } from '../auth/roles.js';
+import { can, ROLES, isTeaching } from '../auth/roles.js';
 import { schoolNow } from '../timetable/timetable.service.js';
 import { daySessions, summary, CLOSE_AFTER } from '../attendance/attendance.service.js';
 import { ACCOUNTS } from '../finances/finances.service.js';
@@ -31,7 +31,7 @@ export async function dashboard(user) {
     teacher && can(user, 'grades:write') ? gradesToEnter(ctx) : null,
     can(user, 'registrations:read') ? registrations(ctx) : null,
     alerts(ctx, office),
-    can(user, 'academics:read') && user.role !== 'teacher' ? occupancy(ctx) : null,
+    can(user, 'academics:read') && !isTeaching(user) ? occupancy(ctx) : null,
   ]);
   const [todayBlock, students, att, fin, take, grades, toGrade, regs, alertList, occ] = blocks;
   return {
@@ -167,7 +167,7 @@ async function takings({ today }) {
 // ---------- Grades ----------
 async function gradesByClass({ user, year }) {
   // A teacher sees the classes they teach; other roles with grades:read the whole school
-  const scoped = user.role === 'teacher';
+  const scoped = isTeaching(user);
   const rows = await all(`
     SELECT c.id, c.name, round(avg(g.score), 2)::float AS average, count(DISTINCT g.student_id)::int AS students
     FROM grades g JOIN exams e ON e.id = g.exam_id JOIN trimesters t ON t.id = e.trimester_id

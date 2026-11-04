@@ -15,7 +15,7 @@ import { useAuth } from '../composables/useAuth';
 import { t } from '../i18n';
 
 const props = defineProps({ id: String }); // injected from the route via `props: true`
-const { user, can } = useAuth();
+const { user, can, isTeaching, canPrintCards } = useAuth();
 
 const cls = ref(null);
 const courses = ref([]);
@@ -46,7 +46,7 @@ const exams = computed(() => flattenExams(year.value));
 
 // A teacher only gets the courses they teach in this class (the API refuses the others anyway)
 const gradableCourses = computed(() =>
-  user.value.role === 'teacher' ? courses.value.filter((c) => c.teacher_id === user.value.teacher_id) : courses.value);
+  isTeaching.value ? courses.value.filter((c) => c.teacher_id === user.value.teacher_id) : courses.value);
 const canAssign = computed(() => can('academics:write') && can('staff:read'));
 
 const totalHours = computed(() => courses.value.reduce((sum, c) => sum + c.hours_per_week, 0));
@@ -86,6 +86,7 @@ async function unassign(courseId) {
     <PageHeader :title="cls.name" :subtitle="`${cls.level} · ${cls.academic_year}`" :back="{ to: '/classes', label: t('nav.classes') }">
       <RouterLink :to="{ path: '/timetable', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="grid" />{{ t('nav.timetable') }}</RouterLink>
       <RouterLink v-if="can(['attendance:read', 'attendance:take'])" :to="{ path: '/attendance/reports', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="userCheck" />{{ t('nav.attendance') }}</RouterLink>
+      <RouterLink v-if="canPrintCards(cls.homeroom_teacher_id)" :to="`/classes/${cls.id}/report-cards`" class="btn primary"><AppIcon name="printer" />{{ t('grades.printCards') }}</RouterLink>
     </PageHeader>
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>
 
