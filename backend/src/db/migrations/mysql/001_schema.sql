@@ -350,7 +350,7 @@ CREATE TABLE users (
   full_name            VARCHAR(150) NOT NULL,
   email                VARCHAR(150),
   phone                VARCHAR(30),
-  role                 ENUM('admin','principal','registrar','bursar','cashier','teacher') NOT NULL,
+  role                 ENUM('admin','principal','registrar','bursar','cashier','teacher','homeroom') NOT NULL,
   teacher_id           INT UNIQUE,
   password_hash        TEXT NOT NULL,
   must_change_password BOOLEAN NOT NULL DEFAULT true,
@@ -367,6 +367,7 @@ CREATE TABLE users (
   CONSTRAINT users_check CHECK (mfa_method <> 'email' OR email IS NOT NULL),
   CONSTRAINT users_check1 CHECK (mfa_method <> 'sms' OR phone IS NOT NULL),
   CONSTRAINT users_check2 CHECK (role <> 'teacher' OR teacher_id IS NOT NULL),
+  CONSTRAINT users_homeroom_teacher_check CHECK (role <> 'homeroom' OR teacher_id IS NOT NULL),
   CONSTRAINT users_username_check CHECK (REGEXP_LIKE(username, '^[a-z0-9._-]{3,40}$', 'c')),
   -- RESTRICT (PostgreSQL: SET NULL): MySQL forbids referential actions on a column used in a CHECK.
   -- The effect is the same for teacher accounts, whose teacher_id can't be NULL.

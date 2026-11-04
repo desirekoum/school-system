@@ -14,6 +14,7 @@ export const PERMISSIONS = {
   'registrations:write': 'Register students, change registration status',
   'grades:read': 'View grades, results and report cards',
   'grades:write': 'Enter grades (teachers: only their own courses)',
+  'report-cards:print': 'Print the report cards of a whole class (homeroom teachers: only their own class)',
   'finance:read': 'View tuition accounts, payments and receipts',
   'payments:write': 'Record tuition payments',
   'payments:void': 'Void tuition payments',
@@ -45,13 +46,14 @@ export const ROLES = {
     description: 'Runs the school: oversees academics and timetables, approves instalment plans, reads all reports.',
     permissions: ['students:read', 'staff:read', 'academics:read', 'academics:write', 'registrations:read',
       'grades:read', 'finance:read', 'plans:approve', 'items:read', 'sales:read', 'expenses:read', 'reports:read',
-      'attendance:read', 'attendance:manage'],
+      'attendance:read', 'attendance:manage', 'report-cards:print'],
   },
   registrar: {
     label: 'Registrar',
     description: 'Admissions and school life: student records, guardians, registrations and attendance.',
     permissions: ['students:read', 'students:write', 'staff:read', 'academics:read', 'registrations:read',
-      'registrations:write', 'grades:read', 'finance:read', 'plans:request', 'attendance:read', 'attendance:manage'],
+      'registrations:write', 'grades:read', 'finance:read', 'plans:request', 'attendance:read', 'attendance:manage',
+      'report-cards:print'],
   },
   bursar: {
     label: 'Bursar',
@@ -71,7 +73,16 @@ export const ROLES = {
     description: 'Enters grades and takes attendance for the courses they teach; reads classes, results and their attendance reports.',
     permissions: ['students:read', 'academics:read', 'grades:read', 'grades:write', 'attendance:take'],
   },
+  homeroom: {
+    label: 'Homeroom teacher',
+    description: 'A teacher in charge of a class: everything a teacher does, plus printing the report cards of the class they are homeroom teacher of.',
+    permissions: ['students:read', 'academics:read', 'grades:read', 'grades:write', 'attendance:take', 'report-cards:print'],
+  },
 };
+
+/** Roles linked to a teacher record: their rights are narrowed to their own courses / class. */
+export const TEACHING_ROLES = ['teacher', 'homeroom'];
+export const isTeaching = (user) => TEACHING_ROLES.includes(user?.role);
 
 export const permissionsOf = (role) => {
   const perms = ROLES[role]?.permissions ?? [];

@@ -13,6 +13,9 @@ export default {
     resultsFoot: 'Course average = mean of the exams in the period. General average = course averages weighted by coefficient.',
     reportCard: 'Report card', noGrades: 'No registration, so no grades yet.', coefShort: 'Coef.', year: 'Year', avg: 'Avg',
     generalAverage: 'General average', classAvg: 'class avg {n}', yearLabel: 'Year:',
+    printCards: 'Print report cards', cardsTitle: 'Report cards · {name}', cardsCount: '{n} report cards, one per page',
+    homeroomTeacher: 'Homeroom teacher', homeroomSignature: 'Homeroom teacher’s signature', principalSignature: 'Principal’s signature',
+    parentSignature: 'Parent’s signature', conduct: 'Comments', printedOn: 'Printed on {date}', noStudentsCards: 'No student in this class yet.',
   },
   fr: {
     examLabel: 'T{trimester} · Évaluation {number}', ordinal: '{n}{suffix}', ordinalSuffix: { one: 'er', two: 'e', few: 'e', other: 'e' },
@@ -27,5 +30,8 @@ export default {
     resultsFoot: 'Moyenne par matière = moyenne des évaluations de la période. Moyenne générale = moyennes des matières pondérées par coefficient.',
     reportCard: 'Bulletin', noGrades: 'Pas d’inscription, donc pas encore de notes.', coefShort: 'Coef.', year: 'Année', avg: 'Moy.',
     generalAverage: 'Moyenne générale', classAvg: 'moy. classe {n}', yearLabel: 'Année :',
+    printCards: 'Imprimer les bulletins', cardsTitle: 'Bulletins · {name}', cardsCount: '{n} bulletins, un par page',
+    homeroomTeacher: 'Professeur principal', homeroomSignature: 'Signature du professeur principal', principalSignature: 'Signature du chef d’établissement',
+    parentSignature: 'Signature du parent', conduct: 'Appréciations', printedOn: 'Imprimé le {date}', noStudentsCards: 'Aucun élève dans cette classe pour l’instant.',
   },
 };

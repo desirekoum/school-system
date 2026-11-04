@@ -29,7 +29,7 @@ let timer;
 onMounted(() => { load(); timer = setInterval(load, 120000); });
 onBeforeUnmount(() => clearInterval(timer));
 
-const isTeacher = computed(() => d.value?.user.role === 'teacher');
+const isTeacher = computed(() => ['teacher', 'homeroom'].includes(d.value?.user.role));
 const greeting = computed(() => {
   const h = Number(d.value?.now.time.slice(0, 2) ?? 12);
   return t(h < 12 ? 'dashboard.morning' : h < 18 ? 'dashboard.afternoon' : 'dashboard.evening');

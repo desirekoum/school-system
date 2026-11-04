@@ -8,11 +8,12 @@ The five other roles cover the school's main jobs:
 | Role | Who | Can | Cannot |
 |---|---|---|---|
 | **System administrator** (`admin`) | IT / head of administration | Everything, including creating users and assigning roles | — |
-| **Principal** (`principal`) | Head of school, deputy | Read every module; manage academic years, classes, courses, assignments and **timetables**; approve or reject instalment plans; financial and **attendance** reports; correct attendance | Record or void money, edit students, enter grades |
-| **Registrar** (`registrar`) | Admissions / school office | Create and edit students and guardians; register students; request instalment plans; read tuition accounts, grades, teachers; **attendance** reports and corrections | Take payments, approve plans, see expenses or reports |
+| **Principal** (`principal`) | Head of school, deputy | Read every module; manage academic years, classes, courses, assignments and **timetables**; approve or reject instalment plans; financial and **attendance** reports; correct attendance; **print the report cards** of any class | Record or void money, edit students, enter grades |
+| **Registrar** (`registrar`) | Admissions / school office | Create and edit students and guardians; register students; request instalment plans; read tuition accounts, grades, teachers; **attendance** reports and corrections; **print the report cards** of any class | Take payments, approve plans, see expenses or reports |
 | **Bursar** (`bursar`) | Finance manager | Payments, voids, plans (request and approve), item catalog and stock, sales, expenses, financial reports | Edit students, registrations or academics; see salaries |
 | **Cashier** (`cashier`) | Front desk | Record tuition payments and sales; read accounts and the catalog | Void anything, see expenses or reports, approve plans |
 | **Teacher** (`teacher`) | Teaching staff | Read students, classes, timetables and results; enter grades and **take attendance only for their own courses** (attendance only while the class happens); attendance reports of the classes they teach | Anything financial, registrations, staff data |
+| **Homeroom teacher** (`homeroom`) | Teacher in charge of a class (professeur principal) | Everything a teacher does, plus **printing the report cards of their own class** (the class whose homeroom teacher is their teacher record) | Print other classes' report cards, anything a teacher can't do |
 
 The full permission matrix is in the app (Users & roles → Roles & permissions) and in
 `backend/src/modules/auth/roles.js`. Roles live in code, not in the database, so every change is reviewed.
@@ -87,3 +88,10 @@ All traffic between the browser and the API is encrypted with TLS:
 Other headers and checks (helmet): HSTS (browsers refuse to go back to HTTP for a year), no MIME sniffing, no
 framing, `Cache-Control: no-store` on API answers, and state-changing requests from another origin are refused
 (CSRF defense on top of `SameSite`).
+
+## Report cards
+
+Printing a whole class's report cards (class page → **Print report cards**, one card per page) needs `report-cards:print`:
+the principal and the registrar (office) for any class, a **homeroom teacher** account only for the class whose
+*Homeroom teacher* field is its teacher record. The API enforces it (`GET /api/classes/:id/report-cards` → 403 otherwise).
+To set one up: on the class, pick the homeroom teacher; in Users, give that teacher's account the *Homeroom teacher* role.

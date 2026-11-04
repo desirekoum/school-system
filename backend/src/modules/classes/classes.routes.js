@@ -3,7 +3,8 @@ import { query } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
 import { paginatedList } from '../../db/paginate.js';
 import { tx, syncStatus } from '../finances/finances.service.js';
-import { getGradebook, saveGradebook, classResults } from '../grades/grades.service.js';
+import { getGradebook, saveGradebook, classResults, classReportCards } from '../grades/grades.service.js';
+import { isTeaching } from '../auth/roles.js';
 
 /**
  * A new class fee also applies to registrations of the class that have no payment and no plan yet.
@@ -82,12 +83,21 @@ router.get('/:id/students', async (req, res) => {
 router.get('/:id/gradebook', async (req, res) => res.json(await getGradebook(req.params.id, req.query)));
 router.put('/:id/gradebook', async (req, res) => {
   // A teacher account may only grade the courses it teaches (row-level check on top of grades:write)
-  if (req.user.role === 'teacher') {
+  if (isTeaching(req.user)) {
     const { rowCount } = await query('SELECT 1 FROM class_courses WHERE class_id = $1 AND course_id = $2 AND teacher_id = $3',
       [req.params.id, req.body.course_id, req.user.teacher_id]);
     if (!rowCount) throw new HttpError(403, 'You can only enter grades for the courses you teach');
   }
   res.json(await saveGradebook(req.params.id, req.body));
+});
+
+// Every report card of the class, to print them in one go (principal, office, and the class's homeroom teacher)
+router.get('/:id/report-cards', async (req, res) => {
+  if (isTeaching(req.user)) {
+    const { rowCount } = await query('SELECT 1 FROM classes WHERE id = $1 AND homeroom_teacher_id = $2', [req.params.id, req.user.teacher_id ?? 0]);
+    if (!rowCount) throw new HttpError(403, 'Only the homeroom teacher of this class can print its report cards');
+  }
+  res.json(await classReportCards(req.params.id));
 });
 
 // Averages and ranks: ?trimester=1|2|3, or nothing for the whole year
