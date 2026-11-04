@@ -22,7 +22,7 @@ export async function register({ student_id, class_id, payment, plan }) {
       if (already) throw new HttpError(409, 'Student already registered for this academic year');
 
       const { rows: [{ count }] } = await client.query(
-        "SELECT count(*)::int FROM registrations WHERE class_id = $1 AND status <> 'cancelled'", [class_id]);
+        "SELECT count(*)::int AS count FROM registrations WHERE class_id = $1 AND status <> 'cancelled'", [class_id]);
       if (count >= cls.capacity) throw new HttpError(409, 'Class is full');
 
       const { rows: [reg] } = await client.query(

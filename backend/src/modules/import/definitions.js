@@ -335,7 +335,7 @@ export const DEFINITIONS = {
         throw new RowError('Class', `already registered in ${already.name} for ${cls.academic_year} (change it on the Registrations page)`);
       }
       const { rows: [{ count }] } = await client.query(
-        "SELECT count(*)::int FROM registrations WHERE class_id = $1 AND status <> 'cancelled'", [cls.id]);
+        "SELECT count(*)::int AS count FROM registrations WHERE class_id = $1 AND status <> 'cancelled'", [cls.id]);
       if (count >= cls.capacity) throw new RowError('Class', `${cls.name} is full (${cls.capacity} places)`);
       const { rows: [reg] } = await client.query(
         'INSERT INTO registrations (student_id, class_id, academic_year, tuition_fee) VALUES ($1, $2, $3, $4) RETURNING id',

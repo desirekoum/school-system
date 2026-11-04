@@ -111,7 +111,13 @@ function rewriteCasts(s) {
     const expr = s.slice(start, idx);
     const target = CAST_TYPES[type.toLowerCase()];
     // Unknown types are PostgreSQL enums (::registration_status): MySQL ENUM columns compare with plain strings, so no cast
-    s = s.slice(0, start) + (arr || !target ? expr : `CAST(${expr} AS ${target})`) + s.slice(idx + all.length);
+    const rest = s.slice(idx + all.length);
+    let out = arr || !target ? expr : `CAST(${expr} AS ${target})`;
+    // Last item of a select list with no alias ("SELECT count(*)::int FROM"): PostgreSQL names the column
+    // after the function or column ("count", "score"); keep that name, MySQL would use the whole expression
+    const name = /^\s+FROM\b/i.test(rest) && out !== expr && /^(?:\w+\.)?(\w+)\s*(?:\(|$)/.exec(expr.trim());
+    if (name) out += ` AS ${name[1]}`;
+    s = s.slice(0, start) + out + rest;
   }
   return s;
 }
