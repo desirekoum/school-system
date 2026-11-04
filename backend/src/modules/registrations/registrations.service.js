@@ -14,21 +14,7 @@ export async function register({ student_id, class_id, payment, plan }) {
   if (!student_id || !class_id) throw new HttpError(400, 'Missing: student_id, class_id');
   try {
     return await tx(async (client) => {
-      const { rows: [cls] } = await client.query('SELECT * FROM classes WHERE id = $1 FOR UPDATE', [class_id]);
-      if (!cls) throw new HttpError(404, 'Class not found');
-
-      const { rowCount: already } = await client.query(
-        'SELECT 1 FROM registrations WHERE student_id = $1 AND academic_year = $2', [student_id, cls.academic_year]);
-      if (already) throw new HttpError(409, 'Student already registered for this academic year');
-
-      const { rows: [{ count }] } = await client.query(
-        "SELECT count(*)::int AS count FROM registrations WHERE class_id = $1 AND status <> 'cancelled'", [class_id]);
-      if (count >= cls.capacity) throw new HttpError(409, 'Class is full');
-
-      const { rows: [reg] } = await client.query(
-        `INSERT INTO registrations (student_id, class_id, academic_year, tuition_fee)
-         VALUES ($1, $2, $3, $4) RETURNING *`, [student_id, class_id, cls.academic_year, cls.tuition_fee]);
-
+      const reg = await registerIn(client, { student_id, class_id });
       if (plan?.instalments) await requestPlan(client, reg.id, plan);
       if (payment?.amount) await recordPayment(client, { ...payment, registration_id: reg.id });
       await syncStatus(client, reg.id); // a free class (fee 0) is confirmed right away
@@ -39,6 +25,28 @@ export async function register({ student_id, class_id, payment, plan }) {
     if (e.code === '23505') throw new HttpError(409, 'Student already registered for this academic year');
     throw e;
   }
+}
+
+/**
+ * The registration itself, inside the caller's transaction (also used by class promotion).
+ * Locks the class row, checks one registration per year and the capacity, copies the class fee.
+ */
+export async function registerIn(client, { student_id, class_id }) {
+  const { rows: [cls] } = await client.query('SELECT * FROM classes WHERE id = $1 FOR UPDATE', [class_id]);
+  if (!cls) throw new HttpError(404, 'Class not found');
+
+  const { rowCount: already } = await client.query(
+    'SELECT 1 FROM registrations WHERE student_id = $1 AND academic_year = $2', [student_id, cls.academic_year]);
+  if (already) throw new HttpError(409, 'Student already registered for this academic year');
+
+  const { rows: [{ count }] } = await client.query(
+    "SELECT count(*)::int AS count FROM registrations WHERE class_id = $1 AND status <> 'cancelled'", [class_id]);
+  if (count >= cls.capacity) throw new HttpError(409, `Class ${cls.name} is full`);
+
+  const { rows: [reg] } = await client.query(
+    `INSERT INTO registrations (student_id, class_id, academic_year, tuition_fee)
+     VALUES ($1, $2, $3, $4) RETURNING *`, [student_id, class_id, cls.academic_year, cls.tuition_fee]);
+  return reg;
 }
 
 /**

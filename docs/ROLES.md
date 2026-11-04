@@ -8,8 +8,8 @@ The five other roles cover the school's main jobs:
 | Role | Who | Can | Cannot |
 |---|---|---|---|
 | **System administrator** (`admin`) | IT / head of administration | Everything, including creating users and assigning roles | — |
-| **Principal** (`principal`) | Head of school, deputy | Read every module; manage academic years, classes, courses, assignments and **timetables**; approve or reject instalment plans; financial and **attendance** reports; correct attendance; **print the report cards** of any class | Record or void money, edit students, enter grades |
-| **Registrar** (`registrar`) | Admissions / school office | Create and edit students and guardians; register students; request instalment plans; read tuition accounts, grades, teachers; **attendance** reports and corrections; **print the report cards** of any class | Take payments, approve plans, see expenses or reports |
+| **Principal** (`principal`) | Head of school, deputy | Read every module; manage academic years, classes, courses, assignments and **timetables**; approve or reject instalment plans; financial and **attendance** reports; correct attendance; **print the report cards** of any class; **promote classes** at the end of the year | Record or void money, edit students, enter grades |
+| **Registrar** (`registrar`) | Admissions / school office | Create and edit students and guardians; register students; request instalment plans; read tuition accounts, grades, teachers; **attendance** reports and corrections; **print the report cards** of any class; **promote classes** at the end of the year | Take payments, approve plans, see expenses or reports |
 | **Bursar** (`bursar`) | Finance manager | Payments, voids, plans (request and approve), item catalog and stock, sales, expenses, financial reports | Edit students, registrations or academics; see salaries |
 | **Cashier** (`cashier`) | Front desk | Record tuition payments and sales; read accounts and the catalog | Void anything, see expenses or reports, approve plans |
 | **Teacher** (`teacher`) | Teaching staff | Read students, classes, timetables and results; enter grades and **take attendance only for their own courses** (attendance only while the class happens); attendance reports of the classes they teach | Anything financial, registrations, staff data |
@@ -95,3 +95,12 @@ Printing a whole class's report cards (class page → **Print report cards**, on
 the principal and the registrar (office) for any class, a **homeroom teacher** account only for the class whose
 *Homeroom teacher* field is its teacher record. The API enforces it (`GET /api/classes/:id/report-cards` → 403 otherwise).
 To set one up: on the class, pick the homeroom teacher; in Users, give that teacher's account the *Homeroom teacher* role.
+
+## End-of-year promotion
+
+Class page → **Promote** (`promotions:manage`: principal, registrar, admin). The screen lists each student with their
+year average and rank and proposes **moves up** (average ≥ 10/20) or **repeats**; after Tle, students who pass
+**graduate**. Any decision and target class can be changed (class council) before **Register**. Applying creates the
+students' registrations for the next academic year in one transaction (all or nothing: a full class cancels everything
+and names the student), with the new class's fee. Last year's registration, grades and report cards are untouched.
+Prerequisite: create the next academic year and its classes. Students already registered for that year are skipped.

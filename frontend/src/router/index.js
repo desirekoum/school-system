@@ -15,6 +15,7 @@ const routes = [
   { path: '/teachers', component: () => import('../views/TeachersView.vue'), meta: { perm: 'staff:read' } },
   { path: '/classes', component: () => import('../views/ClassesView.vue'), meta: { perm: 'academics:read' } },
   { path: '/classes/:id', component: () => import('../views/ClassDetailView.vue'), props: true, meta: { perm: 'academics:read' } },
+  { path: '/classes/:id/promotion', component: () => import('../views/PromotionView.vue'), props: true, meta: { perm: 'promotions:manage' } },
   { path: '/classes/:id/report-cards', component: () => import('../views/ClassReportCardsView.vue'), props: true, meta: { perm: 'report-cards:print' } },
   { path: '/academic-years', component: () => import('../views/AcademicYearsView.vue'), meta: { perm: 'academics:read' } },
   { path: '/finances', component: () => import('../views/FinanceAccountsView.vue'), meta: { perm: 'finance:read' } },

@@ -26,6 +26,7 @@ const ACCESS = [
   ['GET', /^\/teachers(\/|$)/, 'staff:read'],
   ['WRITE', /^\/teachers(\/|$)/, 'staff:write'],
 
+  ['*', /^\/classes\/\d+\/promotion$/, 'promotions:manage'],
   ['GET', /^\/classes\/\d+\/report-cards$/, 'report-cards:print'], // homeroom teachers: own class only (route)
   ['GET', /^\/classes\/\d+\/(gradebook|results)$/, 'grades:read'],
   ['WRITE', /^\/classes\/\d+\/gradebook$/, 'grades:write'],
