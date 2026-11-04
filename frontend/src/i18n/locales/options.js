@@ -28,7 +28,7 @@ export default {
       true: 'Yes', false: 'No',
     },
     role: {
-      admin: 'System administrator', principal: 'Principal', registrar: 'Registrar', bursar: 'Bursar', cashier: 'Cashier', teacher: 'Teacher',
+      admin: 'System administrator', principal: 'Principal', registrar: 'Registrar', bursar: 'Bursar', cashier: 'Cashier', teacher: 'Teacher', homeroom: 'Homeroom teacher',
     },
     roleDescription: {
       admin: 'Super user: every permission, manages user accounts and roles.',
@@ -37,6 +37,7 @@ export default {
       bursar: 'Finance manager: payments, plans, catalog, sales, expenses, voids and reports.',
       cashier: 'Front desk: takes tuition payments and sells items. Cannot void or see reports.',
       teacher: 'Enters grades and takes attendance for the courses they teach; reads classes, results and their attendance reports.',
+      homeroom: 'A teacher in charge of a class: everything a teacher does, plus printing the report cards of the class they are homeroom teacher of.',
     },
     permission: {
       'students:read': 'View students and guardians', 'students:write': 'Create and edit students and guardians',
@@ -51,6 +52,7 @@ export default {
       'expenses:read': 'View expenses', 'expenses:write': 'Record expenses and purchases', 'expenses:void': 'Void expenses',
       'reports:read': 'View financial reports', 'attendance:take': 'Take attendance during their own classes (teachers)',
       'attendance:read': 'View attendance reports for the whole school', 'attendance:manage': 'Record or correct the attendance of any class and date',
+      'report-cards:print': 'Print the report cards of a whole class (homeroom teachers: only their own class)',
       'users:manage': 'Manage user accounts and roles',
     },
   },
@@ -81,7 +83,7 @@ export default {
       true: 'Oui', false: 'Non',
     },
     role: {
-      admin: 'Administrateur système', principal: 'Directeur', registrar: 'Secrétaire', bursar: 'Économe', cashier: 'Caissier', teacher: 'Enseignant',
+      admin: 'Administrateur système', principal: 'Directeur', registrar: 'Secrétaire', bursar: 'Économe', cashier: 'Caissier', teacher: 'Enseignant', homeroom: 'Professeur principal',
     },
     roleDescription: {
       admin: 'Super utilisateur : toutes les permissions, gère les comptes et les rôles.',
@@ -90,6 +92,7 @@ export default {
       bursar: 'Gestion financière : paiements, échéanciers, catalogue, ventes, dépenses, annulations et rapports.',
       cashier: 'Accueil : encaisse la scolarité et vend les articles. Ne peut ni annuler ni voir les rapports.',
       teacher: 'Saisit les notes et fait l’appel pour ses matières ; consulte les classes, les résultats et ses rapports de présence.',
+      homeroom: 'Enseignant responsable d’une classe : tout ce que fait un enseignant, plus l’impression des bulletins de la classe dont il est professeur principal.',
     },
     permission: {
       'students:read': 'Voir les élèves et les tuteurs', 'students:write': 'Créer et modifier les élèves et les tuteurs',
@@ -104,6 +107,7 @@ export default {
       'expenses:read': 'Voir les dépenses', 'expenses:write': 'Enregistrer les dépenses et les achats', 'expenses:void': 'Annuler les dépenses',
       'reports:read': 'Voir les rapports financiers', 'attendance:take': 'Faire l’appel pendant ses propres cours (enseignants)',
       'attendance:read': 'Voir les rapports de présence de toute l’école', 'attendance:manage': 'Saisir ou corriger les présences de toute classe et toute date',
+      'report-cards:print': 'Imprimer les bulletins d’une classe entière (professeur principal : uniquement sa classe)',
       'users:manage': 'Gérer les comptes utilisateurs et les rôles',
     },
   },

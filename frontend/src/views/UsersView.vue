@@ -28,6 +28,7 @@ const EVENTS = ['login', 'login_failed', 'code_failed', 'locked', 'logout', 'pas
 const eventLabel = (e) => (EVENTS.includes(e) ? t(`users.events.${e}`) : e);
 // Role names, descriptions and permission texts come from the translations (the API sends English)
 const roleLabel = (k) => t(`options.role.${k}`);
+const TEACHING = ['teacher', 'homeroom']; // roles linked to a teacher record
 const EVENT_TONE = { login_failed: 'danger', code_failed: 'danger', locked: 'danger', login: 'success' };
 const when = (d) => fmtDateTime(d);
 
@@ -68,7 +69,7 @@ async function submit() {
   formError.value = '';
   try {
     const { id, ...data } = form.value;
-    if (data.role !== 'teacher') data.teacher_id = null;
+    if (!TEACHING.includes(data.role)) data.teacher_id = null;
     if (id) {
       await usersApi.update(id, data);
       form.value = null;
@@ -265,7 +266,7 @@ const log = usePaginatedList((params) => usersApi.events(params), { filters: { e
           </select>
           <span class="muted small">{{ t(`options.roleDescription.${form.role}`) }}</span>
         </label>
-        <label v-if="form.role === 'teacher'" class="field wide"><span>{{ t('users.teacherRecord') }}<b class="req">*</b></span>
+        <label v-if="TEACHING.includes(form.role)" class="field wide"><span>{{ t('users.teacherRecord') }}<b class="req">*</b></span>
           <select v-model="form.teacher_id" required @change="onTeacher">
             <option value="">{{ t('users.chooseTeacher') }}</option>
             <option v-for="tc in teachers" :key="tc.id" :value="tc.id">{{ tc.last_name }} {{ tc.first_name }} · {{ tc.specialty }}</option>

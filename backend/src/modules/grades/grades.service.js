@@ -148,23 +148,32 @@ export async function reportCard(studentId, yearName) {
 
   // Default: the current year if the student is registered in it, else their latest registration
   const { rows: regs } = await query(`
-    SELECT r.academic_year, r.class_id, c.name AS class_name, ay.is_current
+    SELECT r.academic_year, r.class_id, c.name AS class_name, c.homeroom_teacher_id, ay.is_current
     FROM registrations r JOIN classes c ON c.id = r.class_id JOIN academic_years ay ON ay.name = r.academic_year
     WHERE r.student_id = $1 AND r.status <> 'cancelled'
     ORDER BY ay.is_current DESC, r.academic_year DESC`, [studentId]);
   const reg = yearName ? regs.find((r) => r.academic_year === yearName) : regs[0];
   if (!reg) return { student, years: regs.map((r) => r.academic_year), registration: null };
 
+  const { exams, periods } = await classPeriods(reg.class_id, reg.academic_year);
+  const { rows: grades } = await query(
+    'SELECT exam_id, course_id, score::float AS score FROM grades WHERE student_id = $1 AND class_id = $2', [studentId, reg.class_id]);
+  return { student, years: regs.map((r) => r.academic_year), registration: reg, ...buildCard(student.id, exams, grades, periods) };
+}
+
+/** Exams of the year + class results per period (T1, T2, T3, year): what every report card of the class needs. */
+async function classPeriods(classId, yearName) {
   const { rows: exams } = await query(`
     SELECT e.id, e.number, t.number AS trimester
     FROM exams e JOIN trimesters t ON t.id = e.trimester_id JOIN academic_years ay ON ay.id = t.academic_year_id
-    WHERE ay.name = $1 ORDER BY t.number, e.number`, [reg.academic_year]);
-
-  const { rows: grades } = await query(
-    'SELECT exam_id, course_id, score::float FROM grades WHERE student_id = $1 AND class_id = $2', [studentId, reg.class_id]);
-
+    WHERE ay.name = $1 ORDER BY t.number, e.number`, [yearName]);
   // Class results per period give the averages and the rank in one place
-  const periods = await Promise.all([1, 2, 3, null].map((t) => classResults(reg.class_id, t)));
+  const periods = await Promise.all([1, 2, 3, null].map((t) => classResults(classId, t)));
+  return { exams, periods };
+}
+
+/** One student's card from the class data: exam scores, course and general averages, ranks. */
+function buildCard(studentId, exams, grades, periods) {
   const mine = periods.map((p) => p.students.find((s) => s.id === Number(studentId)) ?? {});
   const courses = periods[3].courses.map((c) => ({
     ...c,
@@ -172,11 +181,7 @@ export async function reportCard(studentId, yearName) {
     trimester_avgs: [0, 1, 2].map((i) => mine[i].course_avgs?.[c.id] ?? null),
     year_avg: mine[3].course_avgs?.[c.id] ?? null,
   }));
-
   return {
-    student,
-    years: regs.map((r) => r.academic_year),
-    registration: reg,
     exams,
     courses,
     summary: [0, 1, 2, 3].map((i) => ({
@@ -185,6 +190,30 @@ export async function reportCard(studentId, yearName) {
       rank: mine[i].rank ?? null,
       class_size: periods[i].stats.students,
       class_average: periods[i].stats.average,
+    })),
+  };
+}
+
+/**
+ * Every report card of a class, in alphabetical order, for printing in one go.
+ * The class results are computed once (4 queries) instead of once per student.
+ */
+export async function classReportCards(classId) {
+  const cls = await getClass(classId);
+  const { rows: [homeroom] } = await query('SELECT first_name, last_name FROM teachers WHERE id = $1', [cls.homeroom_teacher_id ?? 0]);
+  const [{ exams, periods }, { rows: students }, { rows: grades }] = await Promise.all([
+    classPeriods(classId, cls.academic_year),
+    query(`${ROSTER} ORDER BY s.last_name, s.first_name, s.id`, [classId]),
+    query('SELECT student_id, exam_id, course_id, score::float AS score FROM grades WHERE class_id = $1', [classId]),
+  ]);
+  const byStudent = new Map();
+  for (const g of grades) (byStudent.get(g.student_id) ?? byStudent.set(g.student_id, []).get(g.student_id)).push(g);
+  return {
+    class: { ...cls, homeroom_teacher: homeroom ? `${homeroom.first_name} ${homeroom.last_name}` : null },
+    cards: students.map((s) => ({
+      student: s,
+      registration: { academic_year: cls.academic_year, class_id: cls.id, class_name: cls.name, homeroom_teacher_id: cls.homeroom_teacher_id },
+      ...buildCard(s.id, exams, byStudent.get(s.id) ?? [], periods),
     })),
   };
 }
