@@ -86,6 +86,7 @@ async function unassign(courseId) {
     <PageHeader :title="cls.name" :subtitle="`${cls.level} · ${cls.academic_year}`" :back="{ to: '/classes', label: t('nav.classes') }">
       <RouterLink :to="{ path: '/timetable', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="grid" />{{ t('nav.timetable') }}</RouterLink>
       <RouterLink v-if="can(['attendance:read', 'attendance:take'])" :to="{ path: '/attendance/reports', query: { class_id: cls.id } }" class="btn secondary"><AppIcon name="userCheck" />{{ t('nav.attendance') }}</RouterLink>
+      <RouterLink v-if="can('promotions:manage')" :to="`/classes/${cls.id}/promotion`" class="btn secondary"><AppIcon name="award" />{{ t('promotion.action') }}</RouterLink>
       <RouterLink v-if="canPrintCards(cls.homeroom_teacher_id)" :to="`/classes/${cls.id}/report-cards`" class="btn primary"><AppIcon name="printer" />{{ t('grades.printCards') }}</RouterLink>
     </PageHeader>
     <div v-if="error" class="alert"><AppIcon name="alert" />{{ error }}</div>

@@ -5,6 +5,7 @@ import { paginatedList } from '../../db/paginate.js';
 import { tx, syncStatus } from '../finances/finances.service.js';
 import { getGradebook, saveGradebook, classResults, classReportCards } from '../grades/grades.service.js';
 import { isTeaching } from '../auth/roles.js';
+import { promotionPreview, applyPromotion } from '../promotion/promotion.service.js';
 
 /**
  * A new class fee also applies to registrations of the class that have no payment and no plan yet.
@@ -99,6 +100,10 @@ router.get('/:id/report-cards', async (req, res) => {
   }
   res.json(await classReportCards(req.params.id));
 });
+
+// End-of-year promotion: preview (?academic_year=), then apply the (possibly overridden) decisions
+router.get('/:id/promotion', async (req, res) => res.json(await promotionPreview(req.params.id, req.query.academic_year || undefined)));
+router.post('/:id/promotion', async (req, res) => res.json(await applyPromotion(req.params.id, req.body)));
 
 // Averages and ranks: ?trimester=1|2|3, or nothing for the whole year
 router.get('/:id/results', async (req, res) => {
