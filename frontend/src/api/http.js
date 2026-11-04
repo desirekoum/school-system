@@ -54,6 +54,8 @@ export const classesApi = {
   students: (id, params) => http.get(`/classes/${id}/students`, { params }).then((r) => r.data),
   gradebook: (id, params) => http.get(`/classes/${id}/gradebook`, { params }).then((r) => r.data),
   saveGradebook: (id, data) => http.put(`/classes/${id}/gradebook`, data).then((r) => r.data),
+  promotion: (id, academicYear) => http.get(`/classes/${id}/promotion`, { params: { academic_year: academicYear } }).then((r) => r.data),
+  promote: (id, data) => http.post(`/classes/${id}/promotion`, data).then((r) => r.data),
   reportCards: (id) => http.get(`/classes/${id}/report-cards`).then((r) => r.data),
   results: (id, trimester) => http.get(`/classes/${id}/results`, { params: { trimester: trimester || undefined } }).then((r) => r.data),
 };
