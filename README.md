@@ -1,6 +1,6 @@
 # SchoolDoc
 
-School management system. **Stack:** Node + Express 5 · PostgreSQL or MySQL 8 · Vue 3 + Vite.
+School management system. **Stack:** Node + Express 5 · PostgreSQL, MySQL 8 or MariaDB · Vue 3 + Vite.
 
 Modules (v0.1): students, registrations, teachers, classes, courses.
 
@@ -74,7 +74,8 @@ cd ../frontend && npm i && npm run dev                    # https://localhost:51
 
 ### On MySQL instead of PostgreSQL
 
-The same code runs on **MySQL 8.0.23+**: the `DATABASE_URL` scheme picks the engine.
+The same code runs on **MySQL 8.0.23+** and **MariaDB 10.11+** (what most shared hosts, Hostinger included, provide):
+the `DATABASE_URL` scheme picks the engine.
 
 ```bash
 mysql -u root -p -e "CREATE DATABASE schooldoc CHARACTER SET utf8mb4"
@@ -88,6 +89,19 @@ How it works: the queries stay written for PostgreSQL and `src/db/mysql.js` tran
 node-postgres does (booleans, dates) and maps MySQL errors to the same PostgreSQL codes, so the API answers the same.
 Known differences: MySQL sorts and searches without accents (`É` sorts with `E`, "elo" finds "Éloïse"), and a
 non-numeric id in a URL gives 404 instead of 400.
+
+### One Node process (shared hosting)
+
+Hosts that run a single Node app per site (Hostinger *Node.js web apps*, cPanel *Setup Node.js App*) can serve
+the API and the Vue build from the same process. From the repository root:
+
+```bash
+npm run build        # installs backend and frontend, builds frontend/dist
+SERVE_FRONTEND=true npm start   # API on /api, the Vue app on every other path
+```
+
+Set the `.env` values as host environment variables, with `TRUST_PROXY=1` and the TLS fields empty (the host
+terminates HTTPS).
 
 Open https://localhost:5173 and sign in. In development, email and SMS codes are printed in the API console
 until `SMTP_*` / `SMS_*` are set in `.env`. Users, roles and the security design are described in

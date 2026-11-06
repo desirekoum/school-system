@@ -92,18 +92,17 @@ export async function voidPayment(id, reason) {
 export async function receipt(id) {
   const { rows: [p] } = await query(`
     SELECT p.*, s.matricule, s.first_name, s.last_name, c.name AS class_name, r.academic_year,
-           r.tuition_fee AS fee, x.total_paid, (r.tuition_fee - x.total_paid)::int AS balance
+           r.tuition_fee AS fee,
+           (SELECT COALESCE(SUM(q.amount), 0)::int FROM payments q
+            WHERE q.registration_id = p.registration_id AND q.voided_at IS NULL
+              AND (q.paid_at < p.paid_at OR (q.paid_at = p.paid_at AND q.id <= p.id))) AS total_paid
     FROM payments p
     JOIN registrations r ON r.id = p.registration_id
     JOIN students s ON s.id = r.student_id
     JOIN classes c ON c.id = r.class_id
-    CROSS JOIN LATERAL (
-      SELECT COALESCE(SUM(q.amount), 0)::int AS total_paid FROM payments q
-      WHERE q.registration_id = p.registration_id AND q.voided_at IS NULL
-        AND (q.paid_at, q.id) <= (p.paid_at, p.id)
-    ) x
     WHERE p.id = $1`, [id]);
   if (!p) throw new HttpError(404, 'Payment not found');
+  p.balance = p.fee - p.total_paid;   // a scalar subquery instead of LATERAL, which MariaDB lacks
   return p;
 }
 

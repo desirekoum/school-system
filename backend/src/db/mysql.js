@@ -271,7 +271,7 @@ const cacheSet = (k, v) => { if (cache.size > 2000) cache.clear(); cache.set(k, 
 
 // ---------- errors: MySQL errno → PostgreSQL SQLSTATE, so errorHandler and the services stay unchanged ----------
 
-const ERRNO = { 1062: '23505', 1451: '23503', 1452: '23503', 1048: '23502', 1364: '23502', 3819: '23514', 1265: '22P02', 1366: '22P02', 1292: '22P02', 1411: '22P02', 1264: '22003', 1213: '40P01', 1205: '55P03' };
+const ERRNO = { 1062: '23505', 1451: '23503', 1452: '23503', 1048: '23502', 1364: '23502', 3819: '23514', 4025: '23514', 1265: '22P02', 1366: '22P02', 1292: '22P02', 1411: '22P02', 1264: '22003', 1213: '40P01', 1205: '55P03' };
 function asPgError(e) {
   if (!e.errno || !ERRNO[e.errno]) return e;
   const err = new Error(e.sqlMessage ?? e.message);
@@ -281,8 +281,12 @@ function asPgError(e) {
   const col = /column '(\w+)'/i.exec(e.sqlMessage ?? '');
   const chk = /Check constraint '(\w+)'/i.exec(e.sqlMessage ?? '');
   const fk = /CONSTRAINT `(\w+)`/.exec(e.sqlMessage ?? '');
-  // Same names as PostgreSQL's default ones for single-column keys: students_matricule_key
-  err.constraint = (key && (key[1] ? `${key[1]}_${key[2]}_key` : key[2])) ?? chk?.[1] ?? fk?.[1];
+  // Same names as PostgreSQL's default ones for single-column keys: students_matricule_key.
+  // MySQL says "for key 'students.matricule'"; MariaDB drops the table, so it comes from the statement.
+  const table = key?.[1] ?? /^\s*(?:INSERT\s+(?:IGNORE\s+)?INTO|UPDATE)\s+`?(\w+)/i.exec(e.sql ?? '')?.[1];
+  const keyName = key && (table && key[2] !== 'PRIMARY' && !key[2].startsWith(`${table}_`) ? `${table}_${key[2]}_key` : key[2]);
+  // MariaDB reports a failed CHECK as "CONSTRAINT `x` failed for ..." (errno 4025)
+  err.constraint = keyName ?? chk?.[1] ?? fk?.[1];
   err.column = col?.[1];
   const dup = /Duplicate entry '(.*)' for key/.exec(e.sqlMessage ?? '');
   if (err.code === '23505') err.detail = key && dup ? `Key (${key[2]})=(${dup[1]}) already exists.` : e.sqlMessage;
@@ -308,8 +312,9 @@ async function run(conn, sql, values) {
   if (!Array.isArray(res) || !fields?.length) return [res, fields];
   const fix = [];
   for (const f of fields) {
-    const expr = !f.orgTable;
-    if ((f.columnType === T_LONG || f.columnType === T_LONGLONG) && f.columnLength === 1 && expr) fix.push([f.name, (v) => v === null ? null : Number(v) === 1]);
+    // A boolean expression is an INT of display length 1 (real INT columns are 11/20 wide).
+    // MySQL reports it without orgTable; MariaDB names the derived table, so length alone decides.
+    if ((f.columnType === T_LONG || f.columnType === T_LONGLONG) && f.columnLength === 1) fix.push([f.name, (v) => v === null ? null : Number(v) === 1]);
     // BIGSERIAL ids (auth_events.id) come back as strings from pg (int8 can exceed 2^53)
     else if (f.columnType === T_LONGLONG && f.orgName === 'id') fix.push([f.name, (v) => v === null ? null : String(v)]);
   }
@@ -329,7 +334,11 @@ export function createPool(url) {
     // BOOLEAN is TINYINT(1): return true/false like PostgreSQL
     typeCast,
   });
-  raw.on('connection', (c) => { c.query(`SET SESSION sql_mode = '${SQL_MODE}', time_zone = '+00:00'`); });
+  // MariaDB (Hostinger shared hosting, many cPanel hosts) has no functional-dependency check:
+  // ONLY_FULL_GROUP_BY would reject GROUP BY r.id ... SELECT r.tuition_fee, which MySQL 8 and PostgreSQL accept.
+  raw.on('connection', (c) => {
+    c.query(`SET SESSION sql_mode = IF(VERSION() LIKE '%MariaDB%', REPLACE('${SQL_MODE}', 'ONLY_FULL_GROUP_BY,', ''), '${SQL_MODE}'), time_zone = '+00:00'`);
+  });
 
   const wrap = (conn) => ({
     async query(text, params) {

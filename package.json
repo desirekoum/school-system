@@ -1,0 +1,10 @@
+{
+  "name": "schooldoc",
+  "private": true,
+  "description": "One-process build for hosts that run a single Node app (e.g. Hostinger Node.js web apps): set SERVE_FRONTEND=true so the API also serves frontend/dist",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "npm ci --prefix backend --omit=dev && npm ci --prefix frontend --include=dev && npm run build --prefix frontend",
+    "start": "node backend/src/server.js"
+  }
+}

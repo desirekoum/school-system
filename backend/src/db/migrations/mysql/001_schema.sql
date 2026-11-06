@@ -15,7 +15,7 @@ CREATE TABLE academic_years (
   current_flag TINYINT GENERATED ALWAYS AS (IF(is_current, 1, NULL)) STORED INVISIBLE,
   UNIQUE KEY uq_one_current_year (current_flag),
   CONSTRAINT academic_years_check CHECK (end_date > start_date),
-  CONSTRAINT academic_years_name_check CHECK (REGEXP_LIKE(name, '^[0-9]{4}-[0-9]{4}$'))
+  CONSTRAINT academic_years_name_check CHECK (name REGEXP '^[0-9]{4}-[0-9]{4}$')
 );
 
 CREATE TABLE trimesters (
@@ -368,7 +368,7 @@ CREATE TABLE users (
   CONSTRAINT users_check1 CHECK (mfa_method <> 'sms' OR phone IS NOT NULL),
   CONSTRAINT users_check2 CHECK (role <> 'teacher' OR teacher_id IS NOT NULL),
   CONSTRAINT users_homeroom_teacher_check CHECK (role <> 'homeroom' OR teacher_id IS NOT NULL),
-  CONSTRAINT users_username_check CHECK (REGEXP_LIKE(username, '^[a-z0-9._-]{3,40}$', 'c')),
+  CONSTRAINT users_username_check CHECK (username REGEXP '^[a-z0-9._-]{3,40}$' AND CAST(username AS BINARY) = CAST(LOWER(username) AS BINARY)),
   -- RESTRICT (PostgreSQL: SET NULL): MySQL forbids referential actions on a column used in a CHECK.
   -- The effect is the same for teacher accounts, whose teacher_id can't be NULL.
   CONSTRAINT users_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE RESTRICT

@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -59,6 +61,17 @@ app.use('/api/import', imports);
 app.use('/api/timetable', timetable);
 app.use('/api/attendance', attendance);
 app.use('/api/dashboard', dashboardRoutes);
+
+// Single-process deployment (shared hosting such as Hostinger's Node.js apps): the API also serves the built
+// Vue app from frontend/dist. Off by default: in development Vite serves the frontend, and on a VPS Caddy/nginx does.
+if (process.env.SERVE_FRONTEND === 'true') {
+  const dist = process.env.FRONTEND_DIST ?? fileURLToPath(new URL('../../frontend/dist', import.meta.url));
+  // Hashed file names (assets/index-3f2a.js) never change content: cache them for a year
+  app.use('/assets', express.static(path.join(dist, 'assets'), { immutable: true, maxAge: '1y' }));
+  app.use(express.static(dist, { index: false }));
+  // SPA fallback: /classes/3/promotion is a Vue Router page, not a file
+  app.get(/^\/(?!api(\/|$)).*/, (req, res) => res.sendFile(path.join(dist, 'index.html')));
+}
 
 app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
 // Express 5 forwards rejected async handlers here automatically

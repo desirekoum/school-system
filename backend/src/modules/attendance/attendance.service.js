@@ -59,9 +59,17 @@ export async function daySessions({ date, class_id }, user) {
   const { rows } = await query(`
     SELECT s.*, a.id AS session_id, a.taken_at, a.updated_at,
            (SELECT count(*)::int FROM registrations r WHERE r.class_id = s.class_id AND r.status <> 'cancelled') AS students,
-           (SELECT json_object_agg(status, n) FROM (SELECT ar.status, count(*)::int AS n FROM attendance_records ar WHERE ar.session_id = a.id GROUP BY ar.status) x) AS counts
+           k.counts
     FROM (${SLOT_SQL}) s
     LEFT JOIN attendance_sessions a ON a.slot_id = s.id AND a.date = $2
+    -- Counts per status, grouped once for the day's sessions (MariaDB can't see a.id inside a nested derived table)
+    LEFT JOIN (
+      SELECT x.session_id, json_object_agg(x.status, x.n) AS counts
+      FROM (SELECT ar.session_id, ar.status, count(*)::int AS n FROM attendance_records ar
+            JOIN attendance_sessions sa ON sa.id = ar.session_id WHERE sa.date = $2
+            GROUP BY ar.session_id, ar.status) x
+      GROUP BY x.session_id
+    ) k ON k.session_id = a.id
     WHERE s.academic_year = $1 AND s.weekday = $3
       AND ($4::int IS NULL OR s.class_id = $4) AND ($5::int IS NULL OR s.teacher_id = $5)
     ORDER BY s.start_time, s.class_name, s.id`,
