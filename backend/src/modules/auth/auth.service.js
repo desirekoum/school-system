@@ -45,9 +45,10 @@ const invalid = () => new HttpError(401, 'Invalid username or password');
 
 // A failed password or code counts toward the lockout; the counter resets only after a full sign-in
 async function registerFailure(user, ip, event) {
+  // locked_until first: MySQL evaluates SET assignments left to right and would see the incremented counter
   const { rows: [u] } = await query(`
-    UPDATE users SET failed_attempts = failed_attempts + 1,
-      locked_until = CASE WHEN failed_attempts + 1 >= $2 THEN now() + make_interval(mins => $3) END
+    UPDATE users SET locked_until = CASE WHEN failed_attempts + 1 >= $2 THEN now() + make_interval(mins => $3) END,
+      failed_attempts = failed_attempts + 1
     WHERE id = $1 RETURNING failed_attempts, locked_until`, [user.id, LOCK_AFTER, LOCK_MINUTES]);
   await logEvent({ user_id: user.id, username: user.username, event, ip });
   if (u.locked_until) {
@@ -143,13 +144,13 @@ export async function verify({ challenge, code }, { ip, userAgent }) {
   if (!ok) {
     const user = { id: c.user_id, username: c.username };
     await registerFailure(user, ip, 'code_failed');
-    const { rows: [left] } = await query(
-      'UPDATE auth_challenges SET attempts = attempts + 1 WHERE id = $1 RETURNING $2 - attempts AS remaining', [c.id, CODE_ATTEMPTS]);
-    if (left.remaining <= 0) {
+    const { rows: [after] } = await query('UPDATE auth_challenges SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts', [c.id]);
+    if (CODE_ATTEMPTS - after.attempts <= 0) {
       await query('DELETE FROM auth_challenges WHERE id = $1', [c.id]);
       throw new HttpError(401, 'Too many wrong codes: sign in again');
     }
-    throw new HttpError(401, `Invalid code (${left.remaining} attempt${left.remaining > 1 ? 's' : ''} left)`);
+    const remaining = CODE_ATTEMPTS - after.attempts;
+    throw new HttpError(401, `Invalid code (${remaining} attempt${remaining > 1 ? 's' : ''} left)`);
   }
 
   const client = await pool.connect();

@@ -16,27 +16,33 @@ export function splitInTrimesters(start, end) {
   }));
 }
 
-// One query builds the nested year → trimesters → exams JSON (json_agg + json_build_object)
 const YEAR_SQL = `
-  SELECT ay.*,
-    (SELECT count(*)::int FROM classes c WHERE c.academic_year = ay.name) AS class_count,
-    COALESCE((
-      SELECT json_agg(json_build_object(
-        'id', t.id, 'number', t.number, 'start_date', t.start_date, 'end_date', t.end_date,
-        'exams', (SELECT json_agg(json_build_object('id', e.id, 'number', e.number, 'exam_date', e.exam_date) ORDER BY e.number)
-                  FROM exams e WHERE e.trimester_id = t.id)
-      ) ORDER BY t.number)
-      FROM trimesters t WHERE t.academic_year_id = ay.id
-    ), '[]') AS trimesters
+  SELECT ay.*, (SELECT count(*)::int FROM classes c WHERE c.academic_year = ay.name) AS class_count
   FROM academic_years ay`;
+
+// Nests year → trimesters → exams: two flat queries assembled in JS (portable to PostgreSQL and MySQL)
+async function withTrimesters(years) {
+  if (!years.length) return years;
+  const ids = years.map((y) => y.id);
+  const { rows: tris } = await query(
+    'SELECT id, academic_year_id, number, start_date, end_date FROM trimesters WHERE academic_year_id = ANY($1::int[]) ORDER BY number', [ids]);
+  const { rows: exams } = tris.length ? await query(
+    'SELECT id, trimester_id, number, exam_date FROM exams WHERE trimester_id = ANY($1::int[]) ORDER BY number', [tris.map((t) => t.id)]) : { rows: [] };
+  for (const y of years) {
+    y.trimesters = tris.filter((t) => t.academic_year_id === y.id).map(({ academic_year_id, ...t }) => ({
+      ...t, exams: exams.filter((e) => e.trimester_id === t.id).map(({ trimester_id, ...e }) => e),
+    }));
+  }
+  return years;
+}
 
 export async function getYear(where, params) {
   const { rows } = await query(`${YEAR_SQL} WHERE ${where}`, params);
   if (!rows[0]) throw new HttpError(404, 'Academic year not found');
-  return rows[0];
+  return (await withTrimesters(rows))[0];
 }
 
-export const listYears = async () => (await query(`${YEAR_SQL} ORDER BY ay.name DESC`)).rows;
+export const listYears = async () => withTrimesters((await query(`${YEAR_SQL} ORDER BY ay.name DESC`)).rows);
 
 function validate({ name, start_date, end_date }) {
   if (!name || !start_date || !end_date) throw new HttpError(400, 'Missing: name, start_date, end_date');

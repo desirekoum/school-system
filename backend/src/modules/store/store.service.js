@@ -1,4 +1,4 @@
-import { query } from '../../db/pool.js';
+import { query, valuesList } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errors.js';
 import { tx, METHODS } from '../finances/finances.service.js';
 
@@ -71,15 +71,12 @@ export async function createSale({ student_id, buyer_name, academic_year, lines,
       INSERT INTO sales (student_id, buyer_name, academic_year, sold_at, method, reference, received_by, notes)
       VALUES ($1, $2, $3, COALESCE($4::date, current_date), $5, $6, $7, $8) RETURNING id`,
       [student_id || null, buyer_name?.trim() || null, year, sold_at || null, method, reference || null, received_by || null, notes || null]);
-    await client.query(`
-      INSERT INTO sale_items (sale_id, item_id, quantity, unit_price)
-      SELECT $1, i.id, u.quantity, i.price
-      FROM unnest($2::int[], $3::int[]) AS u(item_id, quantity) JOIN items i ON i.id = u.item_id`,
-      [s.id, ids, ids.map((i) => qty.get(i))]);
-    await client.query(`
-      UPDATE items i SET stock = i.stock - u.quantity
-      FROM unnest($1::int[], $2::int[]) AS u(item_id, quantity)
-      WHERE i.id = u.item_id AND i.stock IS NOT NULL`, [ids, ids.map((i) => qty.get(i))]);
+    // The price is copied at sale time; items are already locked, in id order
+    const lines = valuesList(items.map((it) => [s.id, it.id, qty.get(it.id), it.price]));
+    await client.query(`INSERT INTO sale_items (sale_id, item_id, quantity, unit_price) VALUES ${lines.sql}`, lines.params);
+    for (const it of items.filter((i) => i.stock !== null)) {
+      await client.query('UPDATE items SET stock = stock - $2 WHERE id = $1', [it.id, qty.get(it.id)]);
+    }
     return s.id;
   });
   return sale(id);
@@ -93,10 +90,9 @@ export async function voidSale(id, reason) {
     if (!s) throw new HttpError(404, 'Sale not found');
     if (s.voided_at) throw new HttpError(409, 'Sale already voided');
     await client.query('UPDATE sales SET voided_at = now(), void_reason = $2 WHERE id = $1', [id, reason.trim()]);
-    await client.query(`
-      UPDATE items i SET stock = i.stock + si.quantity
-      FROM (SELECT item_id, SUM(quantity)::int AS quantity FROM sale_items WHERE sale_id = $1 GROUP BY item_id) si
-      WHERE i.id = si.item_id AND i.stock IS NOT NULL`, [id]);
+    const { rows: back } = await client.query(
+      'SELECT item_id, SUM(quantity)::int AS quantity FROM sale_items WHERE sale_id = $1 GROUP BY item_id ORDER BY item_id', [id]);
+    for (const b of back) await client.query('UPDATE items SET stock = stock + $2 WHERE id = $1 AND stock IS NOT NULL', [b.item_id, b.quantity]);
   });
   return sale(id);
 }

@@ -24,7 +24,7 @@ export function crudRouter({ table, fields, required = [], orderBy = 'id', listS
   router.get('/', async (req, res) => {
     if (req.query.page !== undefined) return res.json(await paginatedList(req.query, listOptions));
     const { where, params } = buildWhere(req.query, listOptions);
-    const { rows } = await query(`SELECT * FROM (${baseSql}) t ${where} ORDER BY ${orderBy}`, params);
+    const { rows } = await query(`SELECT * FROM (${baseSql}) t ${where} ORDER BY ${orderBy}, t.id`, params); // t.id: same order on every run and engine for equal names
     res.json(rows);
   });
 

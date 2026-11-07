@@ -24,11 +24,13 @@ export const SLOT_SQL = `
 const ORDER = 'ORDER BY weekday, start_time, class_name';
 
 /** The school's current date, time and ISO weekday (1 = Monday). */
-export async function schoolNow(client = { query }) {
-  const { rows: [n] } = await client.query(`
-    SELECT to_char(l, 'YYYY-MM-DD') AS date, to_char(l, 'HH24:MI') AS time, extract(isodow FROM l)::int AS weekday
-    FROM (SELECT now() AT TIME ZONE $1 AS l) x`, [SCHOOL_TZ]);
-  return n;
+// Computed with Intl in SCHOOL_TZ: no database time-zone tables needed (MySQL often has none loaded)
+export async function schoolNow(at = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: SCHOOL_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(at).map((x) => [x.type, x.value]));
+  const date = `${p.year}-${p.month}-${p.day}`;
+  return { date, time: `${p.hour}:${p.minute}`, weekday: weekdayOf(date) };
 }
 
 /** Academic year containing a date (falls back to the current year). */
